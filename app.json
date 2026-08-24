@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "react-app",
-    "slug": "react-app",
+    "name": "AgroShop",
+    "slug": "agroshop",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "reactapp",
-    "userInterfaceStyle": "automatic",
+    "scheme": "agroshop",
+    "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -28,7 +28,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0F1014",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
