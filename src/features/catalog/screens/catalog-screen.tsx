@@ -1,14 +1,43 @@
+import { useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { listProducts } from '@/features/catalog/api/catalog.api';
 import { ProductBadge } from '@/features/catalog/components/product-badge';
 import { ProductCard } from '@/features/catalog/components/product-card';
-import { categoryLabels, products, type ProductCategory } from '@/features/catalog/data/products';
+import {
+  categoryLabels,
+  type Product,
+  type ProductCategory,
+} from '@/features/catalog/data/products';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 const categories = Object.keys(categoryLabels) as ProductCategory[];
 
 export function CatalogScreen() {
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    listProducts()
+      .then((response) => {
+        if (!mounted) return;
+        setError(null);
+        setCatalogProducts(response.data);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setError('Nao foi possivel carregar o catalogo pela API.');
+        setCatalogProducts([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
@@ -30,7 +59,12 @@ export function CatalogScreen() {
 
       <FlatList
         contentContainerStyle={styles.list}
-        data={products}
+        data={catalogProducts}
+        ListEmptyComponent={
+          <Text style={error ? styles.errorText : styles.emptyText}>
+            {error ?? 'Nenhum produto retornado pela API.'}
+          </Text>
+        }
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ProductCard compact product={item} />}
         showsVerticalScrollIndicator={false}
@@ -82,5 +116,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPaddingH,
     paddingBottom: Layout.tabBarHeight + Spacing[6],
   },
+  emptyText: {
+    color: Colors.text.muted,
+    fontSize: 13,
+  },
+  errorText: {
+    color: Colors.feedback.error,
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });
-

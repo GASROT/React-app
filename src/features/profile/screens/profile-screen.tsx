@@ -1,17 +1,39 @@
+import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getProfile, type ProfileResponse } from '@/features/profile/api/profile.api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 const options = [
-  ['Dados cadastrais', 'Nome, telefone, e-mail e tipo de perfil PF/PJ'],
-  ['Enderecos', 'Ate 5 enderecos com preenchimento por CEP'],
-  ['Biometria', 'Atalho de login com FaceID ou TouchID'],
-  ['Responsavel tecnico', 'CPF/CREA para defensivos classe I e II'],
-  ['LGPD', 'Privacidade, consentimento e exclusao de conta'],
+  ['dados', 'Dados cadastrais', 'Nome, telefone, e-mail e tipo de perfil PF/PJ'],
+  ['enderecos', 'Enderecos', 'Ate 5 enderecos com preenchimento por CEP'],
+  ['biometria', 'Biometria', 'Atalho de login com FaceID ou TouchID'],
+  ['responsavel-tecnico', 'Responsavel tecnico', 'CPF/CREA para defensivos classe I e II'],
+  ['lgpd', 'LGPD', 'Privacidade, consentimento e exclusao de conta'],
 ] as const;
 
 export function ProfileScreen() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getProfile()
+      .then((response) => {
+        if (mounted) setProfile(response);
+      })
+      .catch(() => {
+        if (mounted) setProfile(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
@@ -19,16 +41,22 @@ export function ProfileScreen() {
           <Text style={styles.avatarText}>AS</Text>
         </View>
         <View style={styles.identity}>
-          <Text style={styles.name}>AgroShop Demo</Text>
-          <Text style={styles.email}>produtor@agroshop.com.br</Text>
-          <Text style={styles.badge}>Perfil PF verificado</Text>
+          <Text style={styles.name}>{profile?.name ?? 'AgroShop Demo'}</Text>
+          <Text style={styles.email}>{profile?.email ?? 'produtor@agroshop.com.br'}</Text>
+          <Text style={styles.badge}>
+            Perfil {profile?.profileType ?? 'PF'} {profile?.emailVerified ? 'verificado' : 'pendente'}
+          </Text>
         </View>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Conta e seguranca</Text>
-        {options.map(([title, subtitle]) => (
-          <Pressable accessibilityRole="button" key={title} style={styles.option}>
+        {options.map(([section, title, subtitle]) => (
+          <Pressable
+            accessibilityRole="button"
+            key={section}
+            onPress={() => router.push({ pathname: '/profile/[section]', params: { section } })}
+            style={styles.option}>
             <View>
               <Text style={styles.optionTitle}>{title}</Text>
               <Text style={styles.optionSubtitle}>{subtitle}</Text>
@@ -133,4 +161,3 @@ const styles = StyleSheet.create({
     fontSize: 30,
   },
 });
-

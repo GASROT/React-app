@@ -1,43 +1,55 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { listOrders } from '@/features/orders/api/orders.api';
+import type { Order } from '@/features/orders/data/orders';
+import { mergeRecentOrders } from '@/features/orders/store/recent-orders.store';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
 
-const orders = [
-  {
-    id: 'AG-2026-0831',
-    status: 'CONFIRMADO',
-    date: '23/08/2026',
-    total: 641.16,
-    items: 'Ureia, Superfosfato, KCL',
-    tracking: 'Aguardando coleta',
-  },
-  {
-    id: 'AG-2026-0794',
-    status: 'ENVIADO',
-    date: '18/08/2026',
-    total: 489.9,
-    items: 'Semente Milho Hibrido AGX',
-    tracking: 'BR-JDL-94015522',
-  },
-  {
-    id: 'AG-2026-0712',
-    status: 'ENTREGUE',
-    date: '02/08/2026',
-    total: 249.9,
-    items: 'Fungicida Foliar Classe IV',
-    tracking: 'Entregue em 07/08/2026',
-  },
-];
-
 const statusColors: Record<string, string> = {
+  PENDENTE: Colors.text.muted,
   CONFIRMADO: Colors.accent.primary,
+  SEPARANDO: Colors.brand.cyan,
   ENVIADO: Colors.feedback.warning,
   ENTREGUE: Colors.feedback.success,
+  CANCELADO: Colors.feedback.error,
 };
 
 export function OrdersScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ finalizedOrderId?: string }>();
+  const [orderList, setOrderList] = useState<Order[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+
+      setLoading(true);
+      listOrders()
+        .then((response) => {
+          if (!mounted) return;
+          setError(null);
+          setOrderList(mergeRecentOrders(response));
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setError('Nao foi possivel carregar os pedidos pela API.');
+          setOrderList([]);
+          setLoading(false);
+        });
+
+      return () => {
+        mounted = false;
+      };
+    }, []),
+  );
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
@@ -45,11 +57,30 @@ export function OrdersScreen() {
         <Text style={styles.subtitle}>Historico, status e rastreamento de entrega.</Text>
       </View>
 
-      <View style={styles.timeline}>
-        {orders.map((order) => (
-          <View key={order.id} style={styles.card}>
+      <ScrollView contentContainerStyle={styles.timeline} showsVerticalScrollIndicator={false}>
+        {loading ? <Text style={styles.emptyText}>Carregando pedidos...</Text> : null}
+        {!loading && orderList.length === 0 ? (
+          <Text style={error ? styles.errorText : styles.emptyText}>
+            {error ?? 'Nenhum pedido retornado pela API.'}
+          </Text>
+        ) : null}
+        {orderList.map((order) => (
+          <Pressable
+            accessibilityRole="button"
+            key={order.id}
+            onPress={() => router.push({ pathname: '/orders/[id]', params: { id: order.id } })}
+            style={({ pressed }) => [
+              styles.card,
+              order.id === params.finalizedOrderId && styles.finalizedCard,
+              pressed && styles.pressed,
+            ]}>
             <View style={styles.cardTop}>
-              <Text style={styles.orderId}>{order.id}</Text>
+              <View>
+                <Text style={styles.orderId}>{order.id}</Text>
+                {order.id === params.finalizedOrderId ? (
+                  <Text style={styles.finalizedText}>Pedido finalizado</Text>
+                ) : null}
+              </View>
               <Text
                 style={[
                   styles.status,
@@ -62,16 +93,35 @@ export function OrdersScreen() {
                 {order.status}
               </Text>
             </View>
-            <Text style={styles.items}>{order.items}</Text>
+            <Text style={styles.items}>
+              {(order.products ?? [])
+                .map((item) => `${item.quantity}x ${item.product.name} ${item.product.packageSize}`)
+                .join(', ')}
+            </Text>
+            <View style={styles.detailGrid}>
+              <Info label="Pagamento" value={order.paymentMethod} />
+              <Info label="Entrega" value={order.shippingMethod} />
+              <Info label="Endereco" value={order.deliveryAddress} />
+              <Info label="Itens" value={`${order.products?.length ?? 0}`} />
+            </View>
             <View style={styles.metaRow}>
               <Text style={styles.meta}>{order.date}</Text>
               <Text style={styles.total}>{formatCurrency(order.total)}</Text>
             </View>
             <Text style={styles.tracking}>Rastreamento: {order.tracking}</Text>
-          </View>
+          </Pressable>
         ))}
-      </View>
+      </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoCell}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.infoValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -99,6 +149,16 @@ const styles = StyleSheet.create({
   timeline: {
     gap: Spacing[3],
     padding: Layout.screenPaddingH,
+    paddingBottom: Layout.tabBarHeight + Spacing[6],
+  },
+  emptyText: {
+    color: Colors.text.muted,
+    fontSize: 13,
+  },
+  errorText: {
+    color: Colors.feedback.error,
+    fontSize: 13,
+    fontWeight: '800',
   },
   card: {
     backgroundColor: Colors.surface.layer1,
@@ -107,6 +167,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: Spacing[2],
     padding: Layout.cardPadding,
+  },
+  finalizedCard: {
+    borderColor: Colors.accent.primary,
+  },
+  finalizedText: {
+    color: Colors.accent.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: Spacing[0.5],
+  },
+  pressed: {
+    opacity: 0.78,
   },
   cardTop: {
     alignItems: 'center',
@@ -130,6 +202,31 @@ const styles = StyleSheet.create({
   items: {
     color: Colors.text.secondary,
     fontSize: 13,
+  },
+  detailGrid: {
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    overflow: 'hidden',
+  },
+  infoCell: {
+    backgroundColor: Colors.surface.layer2,
+    gap: Spacing[0.5],
+    padding: Spacing[2],
+    width: '50%',
+  },
+  infoLabel: {
+    color: Colors.text.muted,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  infoValue: {
+    color: Colors.text.primary,
+    fontSize: 12,
+    fontWeight: '800',
   },
   metaRow: {
     flexDirection: 'row',
@@ -155,4 +252,3 @@ const styles = StyleSheet.create({
     padding: Spacing[2],
   },
 });
-

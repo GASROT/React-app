@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useCart } from '@/features/cart/store/cart.store';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
 import { categoryLabels, type Product } from '../data/products';
@@ -15,9 +16,17 @@ type Props = {
 
 export function ProductCard({ product, compact = false }: Props) {
   const router = useRouter();
+  const { addProduct, getQuantity, loading } = useCart();
   const unavailable = product.stock === 0;
+  const quantity = getQuantity(product.id);
+  const added = quantity > 0;
   const openProduct = () => {
     router.push({ pathname: '/products/[id]', params: { id: product.id } });
+  };
+  const addToCart = () => {
+    if (!unavailable && !loading) {
+      void addProduct(product.id, product.minMultiple ?? 1);
+    }
   };
 
   if (compact) {
@@ -37,9 +46,15 @@ export function ProductCard({ product, compact = false }: Props) {
         </View>
         <View style={styles.compactPrice}>
           <Text style={styles.compactPriceText}>{formatCurrency(product.price)}</Text>
-          <Text style={[styles.addInline, unavailable && styles.disabledText]}>
-            {unavailable ? 'Avise-me' : 'Adicionar'}
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: unavailable || loading, selected: added }}
+            onPress={addToCart}
+            style={[styles.compactAddButton, added && styles.addedButton, unavailable && styles.disabledButton]}>
+            <Text style={[styles.compactAddText, added && styles.addedButtonText, unavailable && styles.disabledText]}>
+              {unavailable ? 'Avise-me' : added ? 'Adicionado' : 'Adicionar'}
+            </Text>
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -69,9 +84,15 @@ export function ProductCard({ product, compact = false }: Props) {
         </Text>
         <Text style={styles.rating}>★ {product.rating.toFixed(1)} ({product.reviews})</Text>
         <PriceDisplay price={product.price} oldPrice={product.oldPrice} />
-        <Text style={[styles.addButton, unavailable && styles.disabledButton]}>
-          {unavailable ? 'Avisar quando disponivel' : '+ Carrinho'}
-        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: unavailable || loading, selected: added }}
+          onPress={addToCart}
+          style={[styles.addButton, added && styles.addedButton, unavailable && styles.disabledButton]}>
+          <Text style={[styles.addButtonText, added && styles.addedButtonText, unavailable && styles.disabledText]}>
+            {unavailable ? 'Avisar quando disponivel' : added ? 'Adicionado' : '+ Carrinho'}
+          </Text>
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -165,21 +186,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   addButton: {
+    alignItems: 'center',
     backgroundColor: Colors.surface.layer3,
     borderColor: Colors.border.default,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    color: Colors.accent.primary,
-    fontSize: 12,
-    fontWeight: '800',
+    justifyContent: 'center',
     marginTop: Spacing[1],
     minHeight: 32,
     paddingHorizontal: Spacing[2],
     paddingVertical: Spacing[2],
+  },
+  addButtonText: {
+    color: Colors.accent.primary,
+    fontSize: 12,
+    fontWeight: '800',
     textAlign: 'center',
   },
+  addedButton: {
+    backgroundColor: Colors.accent.primary,
+    borderColor: Colors.accent.primary,
+  },
+  addedButtonText: {
+    color: Colors.surface.base,
+  },
   disabledButton: {
-    color: Colors.text.muted,
+    backgroundColor: Colors.surface.layer3,
   },
   compactCard: {
     alignItems: 'center',
@@ -205,7 +237,17 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     fontWeight: '900',
   },
-  addInline: {
+  compactAddButton: {
+    alignItems: 'center',
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    minHeight: 32,
+    minWidth: 92,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing[2],
+  },
+  compactAddText: {
     color: Colors.accent.primary,
     fontSize: 12,
     fontWeight: '800',

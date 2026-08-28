@@ -1,59 +1,159 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { cartPreview } from '@/features/catalog/data/products';
+import { confirmOrder } from '@/features/checkout/api/checkout.api';
+import { replaceCart, useCart } from '@/features/cart/store/cart.store';
+import { addRecentOrder } from '@/features/orders/store/recent-orders.store';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
 
-const subtotal = cartPreview.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-const discount = subtotal * 0.1;
-const total = subtotal - discount;
-
 export function CartScreen() {
+  const router = useRouter();
+  const { cart, error, loading, updateQuantity, removeProduct } = useCart();
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const checkoutDisabled = loading || cart.items.length === 0;
+
+  const finishCheckout = async () => {
+    if (checkoutDisabled) return;
+
+    try {
+      setCheckoutError(null);
+      const order = await confirmOrder({
+        paymentMethod: 'pix',
+        shippingMethod: cart.summary.shipping === 0 ? 'Frete gratis AgroShop' : 'PAC Rural',
+        deliveryCep: '14000-000',
+        idempotencyKey: `checkout-${Date.now()}`,
+      });
+      addRecentOrder(order);
+
+      replaceCart({
+        items: [],
+        summary: {
+          subtotal: 0,
+          discount: 0,
+          shipping: 0,
+          total: 0,
+        },
+      });
+      router.replace({
+        pathname: '/(tabs)/orders',
+        params: { finalizedOrderId: order.id },
+      });
+    } catch (caughtError) {
+      setCheckoutError(
+        caughtError instanceof Error ? caughtError.message : 'Nao foi possivel finalizar a compra.',
+      );
+    }
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.title}>Carrinho</Text>
-        <Text style={styles.count}>{cartPreview.length} itens</Text>
+        <Text style={styles.count}>{cart?.items.length ?? 0} itens</Text>
       </View>
 
-      <View style={styles.items}>
-        {cartPreview.map(({ product, quantity }) => (
-          <View key={product.id} style={styles.item}>
-            <View style={styles.marker}>
-              <Text style={styles.markerText}>{product.marker}</Text>
-            </View>
-            <View style={styles.info}>
-              <Text numberOfLines={2} style={styles.itemName}>
-                {product.name} {product.packageSize}
-              </Text>
-              <Text style={styles.itemBrand}>{product.manufacturer}</Text>
-              <View style={styles.itemFooter}>
-                <View style={styles.qty}>
-                  <Text style={styles.qtyButton}>-</Text>
-                  <Text style={styles.qtyValue}>{quantity}</Text>
-                  <Text style={styles.qtyButton}>+</Text>
+      {error && cart.items.length === 0 ? (
+        <View style={styles.stateContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : cart.items.length === 0 ? (
+        <View style={styles.stateContainer}>
+          <Text style={styles.stateText}>{loading ? 'Carregando carrinho...' : 'Seu carrinho esta vazio.'}</Text>
+        </View>
+      ) : (
+        <>
+          <ScrollView contentContainerStyle={styles.items}>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {cart.items.map(({ product, quantity, lineTotal, warning }) => {
+              const step = product.minMultiple ?? 1;
+              const canDecrease = quantity > step;
+              const canIncrease = quantity + step <= product.stock;
+
+              return (
+                <View key={product.id} style={styles.item}>
+                  <View style={styles.marker}>
+                    <Text style={styles.markerText}>{product.marker}</Text>
+                  </View>
+                  <View style={styles.info}>
+                    <Text numberOfLines={2} style={styles.itemName}>
+                      {product.name} {product.packageSize}
+                    </Text>
+                    <Text numberOfLines={2} style={styles.itemDescription}>
+                      {product.description}
+                    </Text>
+                    <Text style={styles.itemBrand}>
+                      {product.manufacturer} - SKU {product.sku}
+                    </Text>
+                    {warning ? <Text style={styles.warning}>{warning}</Text> : null}
+                    <View style={styles.itemFooter}>
+                      <View style={styles.qty}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: !canDecrease || loading }}
+                          onPress={() => {
+                            if (canDecrease) void updateQuantity(product.id, quantity - step);
+                          }}
+                          style={[styles.qtyButton, !canDecrease && styles.qtyButtonDisabled]}>
+                          <Text style={styles.qtyButtonText}>-</Text>
+                        </Pressable>
+                        <Text style={styles.qtyValue}>{quantity}</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: !canIncrease || loading }}
+                          onPress={() => {
+                            if (canIncrease) void updateQuantity(product.id, quantity + step);
+                          }}
+                          style={[styles.qtyButton, !canIncrease && styles.qtyButtonDisabled]}>
+                          <Text style={styles.qtyButtonText}>+</Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.itemPrice}>{formatCurrency(lineTotal)}</Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => void removeProduct(product.id)}
+                      style={styles.removeButton}>
+                      <Text style={styles.removeText}>Remover</Text>
+                    </Pressable>
+                  </View>
                 </View>
-                <Text style={styles.itemPrice}>
-                  {formatCurrency(product.price * quantity)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
+              );
+            })}
+          </ScrollView>
 
-      <View style={styles.summary}>
-        <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
-        <SummaryRow label="Desconto cupom AGR10" positive value={`-${formatCurrency(discount)}`} />
-        <SummaryRow label="Frete" positive value="Gratis" />
-        <View style={styles.divider} />
-        <SummaryRow label="Total" total value={formatCurrency(total)} />
-        <Text style={styles.installments}>ou 3x de {formatCurrency(total / 3)} sem juros</Text>
-        <Pressable accessibilityRole="button" style={styles.checkoutButton}>
-          <Text style={styles.checkoutText}>Finalizar compra</Text>
-        </Pressable>
-      </View>
+          <View style={styles.summary}>
+            {checkoutError ? <Text style={styles.errorText}>{checkoutError}</Text> : null}
+            <SummaryRow label="Subtotal" value={formatCurrency(cart.summary.subtotal)} />
+            <SummaryRow
+              label="Desconto cupom AGR10"
+              positive
+              value={`-${formatCurrency(cart.summary.discount)}`}
+            />
+            <SummaryRow
+              label="Frete"
+              positive={cart.summary.shipping === 0}
+              value={cart.summary.shipping === 0 ? 'Gratis' : formatCurrency(cart.summary.shipping)}
+            />
+            <View style={styles.divider} />
+            <SummaryRow label="Total" total value={formatCurrency(cart.summary.total)} />
+            <Text style={styles.installments}>
+              ou 3x de {formatCurrency(cart.summary.total / 3)} sem juros
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: checkoutDisabled }}
+              onPress={() => void finishCheckout()}
+              style={[styles.checkoutButton, checkoutDisabled && styles.checkoutButtonDisabled]}>
+              <Text style={styles.checkoutText}>
+                {loading ? 'Processando...' : 'Finalizar compra'}
+              </Text>
+            </Pressable>
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -109,9 +209,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   items: {
-    flex: 1,
     gap: Spacing[2],
     padding: Layout.screenPaddingH,
+    paddingBottom: Spacing[4],
+  },
+  stateContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: Layout.screenPaddingH,
+  },
+  stateText: {
+    color: Colors.text.muted,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: Colors.feedback.error,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  warning: {
+    color: Colors.feedback.warning,
+    fontSize: 11,
+    fontWeight: '700',
   },
   item: {
     backgroundColor: Colors.surface.layer1,
@@ -148,6 +271,11 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: 12,
   },
+  itemDescription: {
+    color: Colors.text.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   itemFooter: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -161,14 +289,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   qtyButton: {
+    alignItems: 'center',
     backgroundColor: Colors.surface.layer3,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  qtyButtonDisabled: {
+    opacity: 0.35,
+  },
+  qtyButtonText: {
     color: Colors.text.primary,
     fontSize: 16,
     fontWeight: '900',
-    height: 28,
-    lineHeight: 27,
-    textAlign: 'center',
-    width: 28,
   },
   qtyValue: {
     backgroundColor: Colors.surface.layer2,
@@ -176,16 +309,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontVariant: ['tabular-nums'],
     fontWeight: '800',
-    height: 28,
-    lineHeight: 27,
+    height: 32,
+    lineHeight: 31,
     textAlign: 'center',
-    width: 36,
+    width: 38,
   },
   itemPrice: {
     color: Colors.text.price,
     fontSize: 15,
     fontVariant: ['tabular-nums'],
     fontWeight: '900',
+  },
+  removeButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderColor: Colors.feedback.error,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing[3],
+  },
+  removeText: {
+    color: Colors.feedback.error,
+    fontSize: 12,
+    fontWeight: '800',
   },
   summary: {
     backgroundColor: Colors.surface.layer2,
@@ -239,10 +387,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing[2],
     minHeight: Layout.buttonHeightLg,
   },
+  checkoutButtonDisabled: {
+    opacity: 0.55,
+  },
   checkoutText: {
     color: Colors.white,
     fontSize: 14,
     fontWeight: '900',
   },
 });
-

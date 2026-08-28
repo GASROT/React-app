@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -14,10 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PriceDisplay } from '@/features/catalog/components/price-display';
 import { ProductBadge } from '@/features/catalog/components/product-badge';
 import { ProductCard } from '@/features/catalog/components/product-card';
+import { getFeaturedBanners, listProducts } from '@/features/catalog/api/catalog.api';
 import {
   categoryLabels,
-  featuredBanners,
-  products,
+  type Product,
   type ProductCategory,
 } from '@/features/catalog/data/products';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
@@ -25,9 +25,35 @@ import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 const categories = Object.keys(categoryLabels) as ProductCategory[];
 
 export function HomeScreen() {
+  const router = useRouter();
   const [activeBanner, setActiveBanner] = useState(0);
+  const [homeProducts, setHomeProducts] = useState<Product[]>([]);
+  const [banners, setBanners] = useState<HeroBannerData[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const bannerWidth = Math.min(width - Layout.screenPaddingH * 2, 768);
+
+  useEffect(() => {
+    let mounted = true;
+
+    Promise.all([listProducts(), getFeaturedBanners()])
+      .then(([productResponse, bannerResponse]) => {
+        if (!mounted) return;
+        setError(null);
+        setHomeProducts(productResponse.data);
+        setBanners(bannerResponse);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setError('Nao foi possivel carregar os dados da API.');
+        setHomeProducts([]);
+        setBanners([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -37,31 +63,39 @@ export function HomeScreen() {
           <Text style={styles.searchText}>Buscar fertilizantes, defensivos, SKU...</Text>
         </View>
 
-        <View style={styles.carouselBlock}>
-          <FlatList
-            data={featuredBanners}
-            decelerationRate="fast"
-            horizontal
-            keyExtractor={(item) => item.id}
-            onMomentumScrollEnd={(event) => {
-              setActiveBanner(Math.round(event.nativeEvent.contentOffset.x / bannerWidth));
-            }}
-            pagingEnabled
-            renderItem={({ item }) => <HeroBanner banner={item} width={bannerWidth} />}
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={bannerWidth}
-          />
-          <View style={styles.dots}>
-            {featuredBanners.map((banner, index) => (
-              <View
-                key={banner.id}
-                style={[styles.dot, index === activeBanner && styles.dotActive]}
-              />
-            ))}
-          </View>
-        </View>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <SectionHeader title="Categorias" action="Ver todas" />
+        {banners.length > 0 ? (
+          <View style={styles.carouselBlock}>
+            <FlatList
+              data={banners}
+              decelerationRate="fast"
+              horizontal
+              keyExtractor={(item) => item.id}
+              onMomentumScrollEnd={(event) => {
+                setActiveBanner(Math.round(event.nativeEvent.contentOffset.x / bannerWidth));
+              }}
+              pagingEnabled
+              renderItem={({ item }) => <HeroBanner banner={item} width={bannerWidth} />}
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={bannerWidth}
+            />
+            <View style={styles.dots}>
+              {banners.map((banner, index) => (
+                <View
+                  key={banner.id}
+                  style={[styles.dot, index === activeBanner && styles.dotActive]}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <SectionHeader
+          title="Categorias"
+          action="Ver todas"
+          onActionPress={() => router.push('/categories')}
+        />
         <ScrollView
           contentContainerStyle={styles.chips}
           horizontal
@@ -71,15 +105,23 @@ export function HomeScreen() {
           ))}
         </ScrollView>
 
-        <SectionHeader title="Em destaque" action="Ver mais" />
-        <FlatList
-          columnWrapperStyle={styles.productRow}
-          data={products.slice(0, 4)}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          renderItem={({ item }) => <ProductCard product={item} />}
-          scrollEnabled={false}
+        <SectionHeader
+          title="Em destaque"
+          action="Ver mais"
+          onActionPress={() => router.push('/featured')}
         />
+        {homeProducts.length > 0 ? (
+          <FlatList
+            columnWrapperStyle={styles.productRow}
+            data={homeProducts.slice(0, 4)}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            renderItem={({ item }) => <ProductCard product={item} />}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={styles.emptyText}>Nenhum produto retornado pela API.</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -89,7 +131,7 @@ function HeroBanner({
   banner,
   width,
 }: {
-  banner: (typeof featuredBanners)[number];
+  banner: HeroBannerData;
   width: number;
 }) {
   const router = useRouter();
@@ -119,6 +161,14 @@ function HeroBanner({
   );
 }
 
+type HeroBannerData = {
+  id: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  product: Product;
+};
+
 function Header() {
   return (
     <View style={styles.header}>
@@ -136,11 +186,21 @@ function Header() {
   );
 }
 
-function SectionHeader({ title, action }: { title: string; action: string }) {
+function SectionHeader({
+  title,
+  action,
+  onActionPress,
+}: {
+  title: string;
+  action: string;
+  onActionPress?: () => void;
+}) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionAction}>{action}</Text>
+      <Pressable accessibilityRole="button" onPress={onActionPress}>
+        <Text style={styles.sectionAction}>{action}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -364,5 +424,17 @@ const styles = StyleSheet.create({
     gap: Layout.itemGap,
     paddingHorizontal: Layout.screenPaddingH,
     paddingBottom: Layout.itemGap,
+  },
+  emptyText: {
+    color: Colors.text.muted,
+    fontSize: 13,
+    paddingHorizontal: Layout.screenPaddingH,
+  },
+  errorText: {
+    color: Colors.feedback.error,
+    fontSize: 13,
+    fontWeight: '800',
+    paddingHorizontal: Layout.screenPaddingH,
+    paddingTop: Spacing[3],
   },
 });
