@@ -3,3 +3,4 @@ import { HomeScreen as AgroHomeScreen } from '@/features/catalog/screens/home-sc
 export default function IndexRoute() {
   return <AgroHomeScreen />;
 }
+
