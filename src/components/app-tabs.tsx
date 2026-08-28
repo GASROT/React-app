@@ -1,5 +1,6 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
+import { appTabs } from '@/components/app-tabs.config';
 import { Colors } from '@/shared/theme';
 
 export default function AppTabs() {
@@ -12,45 +13,16 @@ export default function AppTabs() {
         default: { color: Colors.text.muted },
       }}
       tintColor={Colors.accent.primary}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Inicio</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="catalog">
-        <NativeTabs.Trigger.Label>Catalogo</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="cart">
-        <NativeTabs.Trigger.Label>Carrinho</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="orders">
-        <NativeTabs.Trigger.Label>Pedidos</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="profile">
-        <NativeTabs.Trigger.Label>Perfil</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
+      {appTabs.map((tab) => (
+        <NativeTabs.Trigger key={tab.nativeName} name={tab.nativeName}>
+          <NativeTabs.Trigger.Label>{tab.label}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={tab.sf}
+            md={tab.md}
+            selectedColor={Colors.accent.primary}
+          />
+        </NativeTabs.Trigger>
+      ))}
     </NativeTabs>
   );
 }

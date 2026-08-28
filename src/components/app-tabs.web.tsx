@@ -8,6 +8,7 @@ import {
 } from 'expo-router/ui';
 import { Pressable, View, StyleSheet, Text } from 'react-native';
 
+import { appTabs } from '@/components/app-tabs.config';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 export default function AppTabs() {
@@ -16,33 +17,35 @@ export default function AppTabs() {
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
-            <TabButton>Inicio</TabButton>
-          </TabTrigger>
-          <TabTrigger name="catalog" href="/catalog" asChild>
-            <TabButton>Catalogo</TabButton>
-          </TabTrigger>
-          <TabTrigger name="cart" href="/cart" asChild>
-            <TabButton>Carrinho</TabButton>
-          </TabTrigger>
-          <TabTrigger name="orders" href="/orders" asChild>
-            <TabButton>Pedidos</TabButton>
-          </TabTrigger>
-          <TabTrigger name="profile" href="/profile" asChild>
-            <TabButton>Perfil</TabButton>
-          </TabTrigger>
+          {appTabs.map((tab) => (
+            <TabTrigger
+              key={tab.webName}
+              name={tab.webName}
+              href={tab.href}
+              asChild>
+              <TabButton icon={tab.emoji} label={tab.label} />
+            </TabTrigger>
+          ))}
         </CustomTabList>
       </TabList>
     </Tabs>
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+type TabButtonProps = TabTriggerSlotProps & {
+  icon: string;
+  label: string;
+};
+
+export function TabButton({ icon, label, isFocused, ...props }: TabButtonProps) {
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
       <View style={[styles.tabButtonView, isFocused && styles.tabButtonSelected]}>
+        <Text style={[styles.tabIcon, !isFocused && styles.tabIconInactive]}>
+          {icon}
+        </Text>
         <Text style={[styles.tabText, isFocused && styles.tabTextSelected]}>
-          {children}
+          {label}
         </Text>
       </View>
     </Pressable>
@@ -100,10 +103,11 @@ const styles = StyleSheet.create({
   },
   tabButtonView: {
     borderRadius: BorderRadius.sm,
-    minHeight: 36,
+    gap: 2,
+    minHeight: 44,
     minWidth: 76,
-    paddingHorizontal: Spacing[2],
-    paddingVertical: Spacing[2],
+    paddingHorizontal: Spacing[1],
+    paddingVertical: Spacing[1],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -112,10 +116,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent.primaryBorder,
     borderWidth: 1,
   },
+  tabIcon: {
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  tabIconInactive: {
+    opacity: 0.35,
+  },
   tabText: {
     color: Colors.text.muted,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '500',
   },
   tabTextSelected: {
     color: Colors.accent.primary,
