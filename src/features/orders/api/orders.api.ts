@@ -1,4 +1,3 @@
-import type { Order } from '@/features/orders/data/orders';
 import { apiRequest } from '@/shared/services/api/api-client';
 import { normalizeOrder, normalizeOrders } from './order-normalizer';
 

@@ -27,11 +27,11 @@ export type Product = {
   application: string;
   technicalSheetUrl: string;
   wholesalePrice?: number;
-  media: Array<{
+  media: {
     id: string;
     type: 'image' | 'video';
     title: string;
-  }>;
+  }[];
   mapa?: string;
   toxicClass?: 'I' | 'II' | 'III' | 'IV';
   requiresAgronomistCpf?: boolean;

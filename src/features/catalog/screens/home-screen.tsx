@@ -170,13 +170,21 @@ type HeroBannerData = {
 };
 
 function Header() {
+  const router = useRouter();
+
   return (
     <View style={styles.header}>
       <Text style={styles.logo}>
         Agro<Text style={styles.logoAccent}>Shop</Text>
       </Text>
       <View style={styles.headerActions}>
-        <Text style={styles.iconButton}>!</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Entrar na conta"
+          onPress={() => router.push('/login' as never)}
+          style={styles.loginButton}>
+          <Text style={styles.loginButtonText}>Entrar</Text>
+        </Pressable>
         <View style={styles.cartButton}>
           <Text style={styles.iconButtonText}>Cart</Text>
           <Text style={styles.badge}>3</Text>
@@ -235,16 +243,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing[2],
   },
-  iconButton: {
+  loginButton: {
+    alignItems: 'center',
     backgroundColor: Colors.surface.layer3,
     borderColor: Colors.border.default,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    color: Colors.text.secondary,
     height: 32,
-    lineHeight: 30,
-    textAlign: 'center',
-    width: 32,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing[3],
+  },
+  loginButtonText: {
+    color: Colors.accent.primary,
+    fontSize: 12,
+    fontWeight: '900',
   },
   cartButton: {
     alignItems: 'center',

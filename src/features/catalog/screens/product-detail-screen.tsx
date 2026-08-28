@@ -9,7 +9,6 @@ import { ProductBadge } from '@/features/catalog/components/product-badge';
 import { StockIndicator } from '@/features/catalog/components/stock-indicator';
 import { categoryLabels, type Product } from '@/features/catalog/data/products';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
-import { formatCurrency } from '@/shared/utils/currency';
 
 const paymentOptions = [
   {

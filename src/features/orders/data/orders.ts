@@ -20,9 +20,9 @@ export type Order = {
   discount: number;
   shipping: number;
   total: number;
-  products: Array<{
+  products: {
     product: Product;
     quantity: number;
     unitPrice: number;
-  }>;
+  }[];
 };
