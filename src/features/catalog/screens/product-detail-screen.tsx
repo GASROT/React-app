@@ -41,7 +41,7 @@ type PixSimulation = {
 export function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { addProduct, getQuantity, loading: cartLoading } = useCart();
+  const { addProduct, getQuantity, loading: cartLoading, removeProduct } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [activeMediaId, setActiveMediaId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +114,35 @@ export function ProductDetailScreen() {
     }
   };
 
+  const removeCurrentProductFromCart = async () => {
+    if (!product || !addedToCart || cartActionInProgress.current || cartLoading) return false;
+
+    cartActionInProgress.current = true;
+    setAddingToCart(true);
+    setActionFeedback(null);
+
+    try {
+      await removeProduct(product.id);
+      setActionFeedback('Produto removido do carrinho.');
+      return true;
+    } catch {
+      setActionFeedback('Nao foi possivel remover o produto do carrinho. Tente novamente.');
+      return false;
+    } finally {
+      cartActionInProgress.current = false;
+      setAddingToCart(false);
+    }
+  };
+
+  const toggleCurrentProductInCart = () => {
+    if (addedToCart) {
+      void removeCurrentProductFromCart();
+      return;
+    }
+
+    void addCurrentProductToCart();
+  };
+
   const openCartAfterAdding = async () => {
     const ready = addedToCart || (await addCurrentProductToCart());
     if (ready) router.push('/(tabs)/cart');
@@ -123,10 +152,13 @@ export function ProductDetailScreen() {
     if (!product || unavailable) return;
 
     const transactionId = product.sku.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
+    const amount = product.price * 0.95;
+    const formattedAmount = amount.toFixed(2);
+    const amountField = `54${formattedAmount.length.toString().padStart(2, '0')}${formattedAmount}`;
 
     setPixSimulation({
-      amount: product.price * 0.95,
-      code: `00020126580014BR.GOV.BCB.PIX0136AGROSHOP-PIX-FICTICIO-${transactionId}5204000053039865802BR5920AGROSHOP PAGAMENTO6009SAO PAULO62070503***6304ABCD`,
+      amount,
+      code: `00020126580014BR.GOV.BCB.PIX0136AGROSHOP-PIX-FICTICIO-${transactionId}520400005303986${amountField}5802BR5920AGROSHOP PAGAMENTO6009SAO PAULO62070503***6304ABCD`,
     });
     setPixCopied(false);
     setActionFeedback('Codigo Pix ficticio gerado para simulacao.');
@@ -155,7 +187,7 @@ export function ProductDetailScreen() {
       return;
     }
 
-    void addCurrentProductToCart();
+    toggleCurrentProductInCart();
   };
 
   return (
@@ -274,7 +306,11 @@ export function ProductDetailScreen() {
                     price={option.title.includes('PIX') ? product.price * 0.95 : product.price}
                   />
                   <Pressable
-                    accessibilityLabel={`${option.title}: ${option.label}`}
+                    accessibilityLabel={
+                      option.title === 'Comprar agora' && addedToCart
+                        ? 'Remover produto do carrinho'
+                        : `${option.title}: ${option.label}`
+                    }
                     accessibilityRole="button"
                     accessibilityState={{
                       disabled: unavailable || addingToCart,
@@ -288,6 +324,9 @@ export function ProductDetailScreen() {
                     style={[
                       styles.paymentButton,
                       option.tone === 'success' && styles.paymentButtonSuccess,
+                      option.title === 'Comprar agora' &&
+                        addedToCart &&
+                        styles.paymentButtonAdded,
                       (unavailable || addingToCart) && styles.paymentButtonDisabled,
                     ]}>
                     <Text style={styles.paymentButtonText}>
@@ -354,18 +393,25 @@ export function ProductDetailScreen() {
       {product ? (
         <View style={styles.footer}>
         <Pressable
+          accessibilityLabel={
+            addedToCart ? 'Remover produto do carrinho' : 'Adicionar produto ao carrinho'
+          }
           accessibilityRole="button"
           accessibilityState={{ disabled: unavailable || addingToCart, selected: addedToCart }}
           disabled={unavailable || addingToCart}
-          onPress={() => void openCartAfterAdding()}
-          style={[styles.cta, (unavailable || addingToCart) && styles.ctaDisabled]}>
+          onPress={toggleCurrentProductInCart}
+          style={[
+            styles.cta,
+            addedToCart && styles.ctaAdded,
+            (unavailable || addingToCart) && styles.ctaDisabled,
+          ]}>
           <Text style={styles.ctaText}>
             {unavailable
               ? 'Avisar quando disponivel'
-              : addingToCart
-                ? 'Adicionando...'
+                : addingToCart
+                ? 'Atualizando carrinho...'
                 : addedToCart
-                  ? 'Adicionado - ir ao carrinho'
+                  ? 'Adicionado'
                   : 'Adicionar ao carrinho'}
           </Text>
         </Pressable>
@@ -613,6 +659,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   paymentButtonSuccess: { backgroundColor: Colors.feedback.success },
+  paymentButtonAdded: { backgroundColor: Colors.feedback.success },
   paymentButtonDisabled: { backgroundColor: Colors.surface.layer3 },
   pixPanel: {
     backgroundColor: Colors.feedback.successMuted,
@@ -686,5 +733,6 @@ const styles = StyleSheet.create({
     minHeight: Layout.buttonHeightLg,
   },
   ctaDisabled: { backgroundColor: Colors.surface.layer3 },
+  ctaAdded: { backgroundColor: Colors.feedback.success },
   ctaText: { color: Colors.white, fontSize: 14, fontWeight: '900' },
 });

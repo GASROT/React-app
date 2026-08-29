@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useCart } from '@/features/cart/store/cart.store';
@@ -16,16 +17,33 @@ type Props = {
 
 export function ProductCard({ product, compact = false }: Props) {
   const router = useRouter();
-  const { addProduct, getQuantity, loading } = useCart();
+  const { addProduct, getQuantity, loading, removeProduct } = useCart();
+  const [updatingCart, setUpdatingCart] = useState(false);
+  const cartActionInProgress = useRef(false);
   const unavailable = product.stock === 0;
   const quantity = getQuantity(product.id);
   const added = quantity > 0;
+  const cartButtonDisabled = unavailable || loading || updatingCart;
   const openProduct = () => {
     router.push({ pathname: '/products/[id]', params: { id: product.id } });
   };
-  const addToCart = () => {
-    if (!unavailable && !loading) {
-      void addProduct(product.id, product.minMultiple ?? 1);
+  const toggleCart = async () => {
+    if (cartButtonDisabled || cartActionInProgress.current) return;
+
+    cartActionInProgress.current = true;
+    setUpdatingCart(true);
+
+    try {
+      if (added) {
+        await removeProduct(product.id);
+      } else {
+        await addProduct(product.id, product.minMultiple ?? 1);
+      }
+    } catch {
+      // The cart store exposes the API error to the surrounding screen.
+    } finally {
+      cartActionInProgress.current = false;
+      setUpdatingCart(false);
     }
   };
 
@@ -47,12 +65,26 @@ export function ProductCard({ product, compact = false }: Props) {
         <View style={styles.compactPrice}>
           <Text style={styles.compactPriceText}>{formatCurrency(product.price)}</Text>
           <Pressable
+            accessibilityLabel={
+              added ? `Remover ${product.name} do carrinho` : `Adicionar ${product.name} ao carrinho`
+            }
             accessibilityRole="button"
-            accessibilityState={{ disabled: unavailable || loading, selected: added }}
-            onPress={addToCart}
-            style={[styles.compactAddButton, added && styles.addedButton, unavailable && styles.disabledButton]}>
+            accessibilityState={{ disabled: cartButtonDisabled, selected: added }}
+            disabled={cartButtonDisabled}
+            onPress={() => void toggleCart()}
+            style={[
+              styles.compactAddButton,
+              added && styles.addedButton,
+              cartButtonDisabled && styles.disabledButton,
+            ]}>
             <Text style={[styles.compactAddText, added && styles.addedButtonText, unavailable && styles.disabledText]}>
-              {unavailable ? 'Avise-me' : added ? 'Adicionado' : 'Adicionar'}
+              {unavailable
+                ? 'Avise-me'
+                : updatingCart
+                  ? 'Atualizando...'
+                  : added
+                    ? 'Adicionado'
+                    : 'Adicionar'}
             </Text>
           </Pressable>
         </View>
@@ -85,12 +117,26 @@ export function ProductCard({ product, compact = false }: Props) {
         <Text style={styles.rating}>★ {product.rating.toFixed(1)} ({product.reviews})</Text>
         <PriceDisplay price={product.price} oldPrice={product.oldPrice} />
         <Pressable
+          accessibilityLabel={
+            added ? `Remover ${product.name} do carrinho` : `Adicionar ${product.name} ao carrinho`
+          }
           accessibilityRole="button"
-          accessibilityState={{ disabled: unavailable || loading, selected: added }}
-          onPress={addToCart}
-          style={[styles.addButton, added && styles.addedButton, unavailable && styles.disabledButton]}>
+          accessibilityState={{ disabled: cartButtonDisabled, selected: added }}
+          disabled={cartButtonDisabled}
+          onPress={() => void toggleCart()}
+          style={[
+            styles.addButton,
+            added && styles.addedButton,
+            cartButtonDisabled && styles.disabledButton,
+          ]}>
           <Text style={[styles.addButtonText, added && styles.addedButtonText, unavailable && styles.disabledText]}>
-            {unavailable ? 'Avisar quando disponivel' : added ? 'Adicionado' : '+ Carrinho'}
+            {unavailable
+              ? 'Avisar quando disponivel'
+              : updatingCart
+                ? 'Atualizando...'
+                : added
+                  ? 'Adicionado'
+                  : '+ Carrinho'}
           </Text>
         </Pressable>
       </View>
@@ -193,7 +239,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     marginTop: Spacing[1],
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: Spacing[2],
     paddingVertical: Spacing[2],
   },
@@ -204,8 +250,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   addedButton: {
-    backgroundColor: Colors.accent.primary,
-    borderColor: Colors.accent.primary,
+    backgroundColor: Colors.feedback.success,
+    borderColor: Colors.feedback.success,
   },
   addedButtonText: {
     color: Colors.surface.base,
@@ -242,7 +288,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.default,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    minHeight: 32,
+    minHeight: 44,
     minWidth: 92,
     justifyContent: 'center',
     paddingHorizontal: Spacing[2],
