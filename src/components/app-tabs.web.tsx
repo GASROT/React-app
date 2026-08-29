@@ -6,24 +6,29 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
+import { useSyncExternalStore } from 'react';
 import { Pressable, View, StyleSheet, Text } from 'react-native';
 
-import { appTabs } from '@/components/app-tabs.config';
+import { getAppTabsForRole } from '@/components/app-tabs.config';
+import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 export default function AppTabs() {
+  const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
+  const tabs = getAppTabsForRole(user?.role);
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          {appTabs.map((tab) => (
+          {tabs.map((tab) => (
             <TabTrigger
               key={tab.webName}
               name={tab.webName}
-              href={tab.href}
+              href={tab.href as never}
               asChild>
-              <TabButton icon={tab.emoji} label={tab.label} />
+              <TabButton icon={tab.icon} label={tab.label} />
             </TabTrigger>
           ))}
         </CustomTabList>
