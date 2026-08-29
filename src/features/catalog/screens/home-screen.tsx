@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { SymbolView } from 'expo-symbols';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   FlatList,
   Pressable,
@@ -20,6 +21,7 @@ import {
   type Product,
   type ProductCategory,
 } from '@/features/catalog/data/products';
+import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 
 const categories = Object.keys(categoryLabels) as ProductCategory[];
@@ -171,6 +173,7 @@ type HeroBannerData = {
 
 function Header() {
   const router = useRouter();
+  const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
 
   return (
     <View style={styles.header}>
@@ -178,13 +181,27 @@ function Header() {
         Agro<Text style={styles.logoAccent}>Shop</Text>
       </Text>
       <View style={styles.headerActions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Entrar na conta"
-          onPress={() => router.push('/login' as never)}
-          style={styles.loginButton}>
-          <Text style={styles.loginButtonText}>Entrar</Text>
-        </Pressable>
+        {user ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir perfil"
+            onPress={() => router.push('/profile' as never)}
+            style={styles.profileButton}>
+            <SymbolView
+              name={{ ios: 'person.fill', android: 'person', web: 'person' }}
+              size={18}
+              tintColor={Colors.accent.primary}
+            />
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Entrar na conta"
+            onPress={() => router.push('/login' as never)}
+            style={styles.loginButton}>
+            <Text style={styles.loginButtonText}>Entrar</Text>
+          </Pressable>
+        )}
         <View style={styles.cartButton}>
           <Text style={styles.iconButtonText}>Cart</Text>
           <Text style={styles.badge}>3</Text>
@@ -257,6 +274,16 @@ const styles = StyleSheet.create({
     color: Colors.accent.primary,
     fontSize: 12,
     fontWeight: '900',
+  },
+  profileButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.surface.layer3,
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   cartButton: {
     alignItems: 'center',

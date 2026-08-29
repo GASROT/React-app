@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getProfile, type ProfileResponse } from '@/features/profile/api/profile.api';
+import { getCurrentUser, logout, type LoginResponse } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 const options = [
@@ -16,41 +16,81 @@ const options = [
 
 export function ProfileScreen() {
   const router = useRouter();
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [user, setUser] = useState<LoginResponse['user'] | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      setUser(getCurrentUser());
+    }, []),
+  );
 
-    getProfile()
-      .then((response) => {
-        if (mounted) setProfile(response);
-      })
-      .catch(() => {
-        if (mounted) setProfile(null);
-      });
+  if (!user) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>AS</Text>
+          </View>
+          <View style={styles.identity}>
+            <Text style={styles.name}>Acesse sua conta</Text>
+            <Text style={styles.email}>
+              Entre ou registre-se para ver dados cadastrais, enderecos e preferencias.
+            </Text>
+          </View>
+        </View>
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>Conta AgroShop</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/login' as never)}
+            style={styles.primaryAction}>
+            <Text style={styles.primaryActionText}>Entrar</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/register' as never)}
+            style={styles.secondaryAction}>
+            <Text style={styles.secondaryActionText}>Registrar</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const initials = user.name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>AS</Text>
+          <Text style={styles.avatarText}>{initials || 'AS'}</Text>
         </View>
         <View style={styles.identity}>
-          <Text style={styles.name}>{profile?.name ?? 'AgroShop Demo'}</Text>
-          <Text style={styles.email}>{profile?.email ?? 'produtor@agroshop.com.br'}</Text>
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.email}>{user.email}</Text>
           <Text style={styles.badge}>
-            Perfil {profile?.profileType ?? 'PF'} {profile?.emailVerified ? 'verificado' : 'pendente'}
+            Perfil {user.profileType} {user.emailVerified ? 'verificado' : 'pendente'}
           </Text>
         </View>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Conta e seguranca</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            logout();
+            setUser(null);
+          }}
+          style={styles.logoutAction}>
+          <Text style={styles.logoutActionText}>Sair da conta</Text>
+        </Pressable>
         {options.map(([section, title, subtitle]) => (
           <Pressable
             accessibilityRole="button"
@@ -73,6 +113,48 @@ const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: Colors.surface.base,
     flex: 1,
+  },
+  primaryAction: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primary,
+    borderRadius: BorderRadius.sm,
+    justifyContent: 'center',
+    minHeight: Layout.buttonHeightLg,
+  },
+  primaryActionText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    backgroundColor: Colors.surface.layer2,
+    borderColor: Colors.border.strong,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: Layout.buttonHeightLg,
+  },
+  secondaryActionText: {
+    color: Colors.accent.primary,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  logoutAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.surface.layer2,
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: Spacing[3],
+  },
+  logoutActionText: {
+    color: Colors.feedback.error,
+    fontSize: 12,
+    fontWeight: '900',
   },
   header: {
     alignItems: 'center',

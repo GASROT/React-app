@@ -1,8 +1,10 @@
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useCart } from '@/features/cart/store/cart.store';
 import { getProduct } from '@/features/catalog/api/catalog.api';
 import { PriceDisplay } from '@/features/catalog/components/price-display';
 import { ProductBadge } from '@/features/catalog/components/product-badge';
@@ -26,20 +28,32 @@ const paymentOptions = [
   {
     title: 'Boleto rural',
     subtitle: 'Vencimento em 3 dias uteis',
-    label: 'Gerar boleto',
+    label: 'Ir ao carrinho',
     tone: 'neutral',
   },
 ] as const;
 
+type PixSimulation = {
+  amount: number;
+  code: string;
+};
+
 export function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { addProduct, getQuantity, loading: cartLoading } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [activeMediaId, setActiveMediaId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [pixSimulation, setPixSimulation] = useState<PixSimulation | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const cartActionInProgress = useRef(false);
   const activeMedia =
     product?.media.find((media) => media.id === activeMediaId) ?? product?.media[0];
   const unavailable = product?.stock === 0;
+  const addedToCart = product ? getQuantity(product.id) > 0 : false;
 
   useEffect(() => {
     let mounted = true;
@@ -71,6 +85,77 @@ export function ProductDetailScreen() {
     }
 
     router.replace('/(tabs)/catalog');
+  };
+
+  const addCurrentProductToCart = async () => {
+    if (!product || unavailable) return false;
+
+    if (addedToCart) {
+      setActionFeedback('Este produto ja esta no carrinho.');
+      return true;
+    }
+
+    if (cartActionInProgress.current || cartLoading) return false;
+
+    cartActionInProgress.current = true;
+    setAddingToCart(true);
+    setActionFeedback(null);
+
+    try {
+      await addProduct(product.id, product.minMultiple ?? 1);
+      setActionFeedback('Produto adicionado ao carrinho.');
+      return true;
+    } catch {
+      setActionFeedback('Nao foi possivel adicionar o produto ao carrinho. Tente novamente.');
+      return false;
+    } finally {
+      cartActionInProgress.current = false;
+      setAddingToCart(false);
+    }
+  };
+
+  const openCartAfterAdding = async () => {
+    const ready = addedToCart || (await addCurrentProductToCart());
+    if (ready) router.push('/(tabs)/cart');
+  };
+
+  const generatePixSimulation = () => {
+    if (!product || unavailable) return;
+
+    const transactionId = product.sku.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
+
+    setPixSimulation({
+      amount: product.price * 0.95,
+      code: `00020126580014BR.GOV.BCB.PIX0136AGROSHOP-PIX-FICTICIO-${transactionId}5204000053039865802BR5920AGROSHOP PAGAMENTO6009SAO PAULO62070503***6304ABCD`,
+    });
+    setPixCopied(false);
+    setActionFeedback('Codigo Pix ficticio gerado para simulacao.');
+  };
+
+  const copyPixCode = async () => {
+    if (!pixSimulation) return;
+
+    try {
+      await Clipboard.setStringAsync(pixSimulation.code);
+      setPixCopied(true);
+      setActionFeedback('Codigo Pix copiado.');
+    } catch {
+      setActionFeedback('Nao foi possivel copiar o codigo Pix.');
+    }
+  };
+
+  const handlePaymentOption = (title: (typeof paymentOptions)[number]['title']) => {
+    if (title === 'PIX AgroShop') {
+      generatePixSimulation();
+      return;
+    }
+
+    if (title === 'Boleto rural') {
+      void openCartAfterAdding();
+      return;
+    }
+
+    void addCurrentProductToCart();
   };
 
   return (
@@ -188,17 +273,68 @@ export function ProductDetailScreen() {
                   <PriceDisplay
                     price={option.title.includes('PIX') ? product.price * 0.95 : product.price}
                   />
-                  <Text
+                  <Pressable
+                    accessibilityLabel={`${option.title}: ${option.label}`}
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      disabled: unavailable || addingToCart,
+                      selected:
+                        option.title === 'Comprar agora'
+                          ? addedToCart
+                          : option.title === 'PIX AgroShop' && Boolean(pixSimulation),
+                    }}
+                    disabled={unavailable || addingToCart}
+                    onPress={() => handlePaymentOption(option.title)}
                     style={[
                       styles.paymentButton,
                       option.tone === 'success' && styles.paymentButtonSuccess,
+                      (unavailable || addingToCart) && styles.paymentButtonDisabled,
                     ]}>
-                    {unavailable ? 'Avise-me' : option.label}
-                  </Text>
+                    <Text style={styles.paymentButtonText}>
+                      {unavailable
+                        ? 'Indisponivel'
+                        : addingToCart
+                          ? 'Aguarde...'
+                          : option.title === 'Comprar agora' && addedToCart
+                            ? 'Adicionado'
+                            : option.title === 'PIX AgroShop' && pixSimulation
+                              ? 'Gerado'
+                              : option.label}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
             ))}
+
+            {pixSimulation ? (
+              <View accessibilityLiveRegion="polite" style={styles.pixPanel}>
+                <Text style={styles.pixTitle}>Pagamento rapido Pix AgroShop</Text>
+                <Text style={styles.pixWarning}>
+                  SIMULACAO: este codigo e ficticio e nenhum pagamento real sera processado.
+                </Text>
+                <PriceDisplay price={pixSimulation.amount} />
+                <Text selectable style={styles.pixCode}>
+                  {pixSimulation.code}
+                </Text>
+                <Text style={styles.pixExpiry}>
+                  Valido por 30 minutos apos a geracao.
+                </Text>
+                <Pressable
+                  accessibilityLabel="Copiar codigo Pix ficticio"
+                  accessibilityRole="button"
+                  onPress={() => void copyPixCode()}
+                  style={[styles.copyButton, pixCopied && styles.copyButtonSuccess]}>
+                  <Text style={styles.copyButtonText}>{pixCopied ? 'Copiado' : 'Copiar codigo Pix'}</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
+
+          {actionFeedback ? (
+            <Text accessibilityLiveRegion="polite" style={styles.actionFeedback}>
+              {actionFeedback}
+            </Text>
+          ) : null}
 
           <StockIndicator stock={product.stock} />
 
@@ -219,10 +355,18 @@ export function ProductDetailScreen() {
         <View style={styles.footer}>
         <Pressable
           accessibilityRole="button"
-          disabled={unavailable}
-          style={[styles.cta, unavailable && styles.ctaDisabled]}>
+          accessibilityState={{ disabled: unavailable || addingToCart, selected: addedToCart }}
+          disabled={unavailable || addingToCart}
+          onPress={() => void openCartAfterAdding()}
+          style={[styles.cta, (unavailable || addingToCart) && styles.ctaDisabled]}>
           <Text style={styles.ctaText}>
-            {unavailable ? 'Avisar quando disponivel' : 'Comprar agora'}
+            {unavailable
+              ? 'Avisar quando disponivel'
+              : addingToCart
+                ? 'Adicionando...'
+                : addedToCart
+                  ? 'Adicionado - ir ao carrinho'
+                  : 'Adicionar ao carrinho'}
           </Text>
         </Pressable>
       </View>
@@ -451,19 +595,69 @@ const styles = StyleSheet.create({
   paymentSubtitle: { color: Colors.text.secondary, fontSize: 13, lineHeight: 18 },
   paymentAction: { alignItems: 'flex-end', gap: Spacing[1] },
   paymentButton: {
+    alignItems: 'center',
     backgroundColor: Colors.accent.primary,
     borderColor: Colors.black,
     borderRadius: BorderRadius.sm,
     borderWidth: 2,
-    color: Colors.white,
-    fontSize: 13,
-    fontWeight: '900',
+    justifyContent: 'center',
+    minHeight: 36,
     minWidth: 96,
     paddingHorizontal: Spacing[3],
     paddingVertical: Spacing[2],
+  },
+  paymentButtonText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: '900',
     textAlign: 'center',
   },
-  paymentButtonSuccess: { backgroundColor: '#75B022' },
+  paymentButtonSuccess: { backgroundColor: Colors.feedback.success },
+  paymentButtonDisabled: { backgroundColor: Colors.surface.layer3 },
+  pixPanel: {
+    backgroundColor: Colors.feedback.successMuted,
+    borderColor: Colors.feedback.success,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing[3],
+    padding: Layout.cardPadding,
+  },
+  pixTitle: { color: Colors.text.primary, fontSize: 16, fontWeight: '900' },
+  pixWarning: {
+    color: Colors.feedback.warning,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  pixCode: {
+    backgroundColor: Colors.surface.layer1,
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    color: Colors.text.secondary,
+    fontFamily: 'monospace',
+    fontSize: 11,
+    lineHeight: 17,
+    padding: Spacing[3],
+  },
+  pixExpiry: { color: Colors.text.secondary, fontSize: 12 },
+  copyButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.accent.primary,
+    borderRadius: BorderRadius.sm,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: Spacing[4],
+  },
+  copyButtonSuccess: { backgroundColor: Colors.feedback.success },
+  copyButtonText: { color: Colors.text.inverse, fontSize: 13, fontWeight: '900' },
+  actionFeedback: {
+    color: Colors.feedback.success,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
   restricted: {
     backgroundColor: Colors.feedback.warningMuted,
     borderColor: '#FFB83060',
