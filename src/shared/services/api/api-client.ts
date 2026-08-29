@@ -28,12 +28,12 @@ export const apiBaseUrl = resolveApiBaseUrl();
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       ...init?.headers,
     },
-    ...init,
   });
 
   if (!response.ok) {
