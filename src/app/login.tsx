@@ -30,7 +30,7 @@ export default function LoginRoute() {
 
     try {
       const response = await login(email.trim(), password);
-      router.replace(response.redirectTo as never);
+      router.replace((response.user.role === 'ADMIN' ? '/dashboard' : '/catalog') as never);
     } catch {
       setError('Nao foi possivel autenticar. Confira e-mail e senha.');
     } finally {
