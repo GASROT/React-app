@@ -1,17 +1,25 @@
 import {
-  Tabs,
   TabList,
-  TabTrigger,
-  TabSlot,
-  TabTriggerSlotProps,
   TabListProps,
+  TabSlot,
+  TabTrigger,
+  TabTriggerSlotProps,
+  Tabs,
 } from 'expo-router/ui';
-import { useSyncExternalStore } from 'react';
-import { Pressable, View, StyleSheet, Text } from 'react-native';
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { Animated, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getAppTabsForRole } from '@/components/app-tabs.config';
 import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
+
+type NavigationContextValue = {
+  activeX: Animated.Value;
+  registerCenter: (index: number, center: number) => void;
+  selectIndex: (index: number) => void;
+};
+
+const NavigationContext = createContext<NavigationContextValue | null>(null);
 
 export default function AppTabs() {
   const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
@@ -22,13 +30,13 @@ export default function AppTabs() {
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          {tabs.map((tab) => (
+          {tabs.map((tab, index) => (
             <TabTrigger
               key={tab.webName}
               name={tab.webName}
               href={tab.href as never}
               asChild>
-              <TabButton icon={tab.icon} label={tab.label} />
+              <TabButton index={index} icon={tab.icon} label={tab.label} />
             </TabTrigger>
           ))}
         </CustomTabList>
@@ -38,102 +46,181 @@ export default function AppTabs() {
 }
 
 type TabButtonProps = TabTriggerSlotProps & {
+  index: number;
   icon: string;
   label: string;
 };
 
-export function TabButton({ icon, label, isFocused, ...props }: TabButtonProps) {
+export function TabButton({ index, icon, label, isFocused, ...props }: TabButtonProps) {
+  const navigation = useContext(NavigationContext);
+  const [iconProgress] = useState(() => new Animated.Value(isFocused ? 1 : 0));
+
+  useEffect(() => {
+    Animated.spring(iconProgress, {
+      toValue: isFocused ? 1 : 0,
+      damping: 17,
+      mass: 0.7,
+      stiffness: 190,
+      useNativeDriver: true,
+    }).start();
+  }, [iconProgress, isFocused]);
+
+  useEffect(() => {
+    if (isFocused) navigation?.selectIndex(index);
+  }, [index, isFocused, navigation]);
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const { width, x } = event.nativeEvent.layout;
+    navigation?.registerCenter(index, x + width / 2);
+  };
+
+  const iconStyle = {
+    opacity: iconProgress.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }),
+    transform: [
+      { translateY: iconProgress.interpolate({ inputRange: [0, 1], outputRange: [0, -14] }) },
+      { scale: iconProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) },
+    ],
+  } as const;
+
   return (
-    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
-      <View style={[styles.tabButtonView, isFocused && styles.tabButtonSelected]}>
-        <Text style={[styles.tabIcon, !isFocused && styles.tabIconInactive]}>
+    <Pressable
+      {...props}
+      accessibilityLabel={label}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isFocused }}
+      onLayout={handleLayout}
+      style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>
+      <Animated.View style={[styles.iconContainer, iconStyle]}>
+        <Text style={[styles.tabIcon, isFocused ? styles.activeIcon : styles.inactiveIcon]}>
           {icon}
         </Text>
-        <Text style={[styles.tabText, isFocused && styles.tabTextSelected]}>
-          {label}
-        </Text>
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }
 
 export function CustomTabList(props: TabListProps) {
+  const [activeX] = useState(() => new Animated.Value(0));
+  const [centers] = useState(() => new Map<number, number>());
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const animateToIndex = (index: number) => {
+    setActiveIndex(index);
+    const center = centers.get(index);
+    if (center === undefined) return;
+
+    Animated.spring(activeX, {
+      toValue: center,
+      damping: 18,
+      mass: 0.8,
+      stiffness: 170,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const registerCenter = (index: number, center: number) => {
+    centers.set(index, center);
+    if (activeIndex === index || activeIndex === null) {
+      activeX.setValue(center);
+    }
+  };
+
+  const contextValue: NavigationContextValue = {
+    activeX,
+    registerCenter,
+    selectIndex: animateToIndex,
+  };
+
   return (
-    <View {...props} style={styles.tabListContainer}>
-      <View style={styles.innerContainer}>
-        <Text style={styles.brandText}>
-          Agro<Text style={styles.brandAccent}>Shop</Text>
-        </Text>
-        {props.children}
+    <NavigationContext.Provider value={contextValue}>
+      <View {...props} style={styles.tabListContainer}>
+        <View style={styles.innerContainer}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.navCurve, { transform: [{ translateX: activeX }] }]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.activeCircle, { transform: [{ translateX: activeX }] }]}
+          />
+          {props.children}
+        </View>
       </View>
-    </View>
+    </NavigationContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
   tabListContainer: {
+    alignItems: 'center',
+    bottom: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
     position: 'absolute',
     width: '100%',
-    bottom: 0,
-    padding: Spacing[3],
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
   },
   innerContainer: {
-    backgroundColor: Colors.surface.layer2,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.surface.layer2,
+    borderTopColor: Colors.border.default,
+    borderTopWidth: 1,
+    flexDirection: 'row',
     flexGrow: 1,
-    gap: Spacing[1],
-    maxWidth: 800,
-    minHeight: Layout.tabBarHeight,
-    paddingHorizontal: Spacing[2],
-    paddingVertical: Spacing[2],
+    justifyContent: 'space-around',
+    maxWidth: 680,
+    minHeight: Layout.tabBarHeight + Spacing[2],
+    overflow: 'visible',
+    paddingHorizontal: Spacing[3],
+    position: 'relative',
   },
-  brandText: {
-    color: Colors.text.primary,
-    fontSize: 13,
-    fontWeight: '900',
-    marginRight: 'auto',
+  navCurve: {
+    backgroundColor: Colors.surface.layer2,
+    borderRadius: BorderRadius.full,
+    height: 74,
+    left: -37,
+    position: 'absolute',
+    top: -28,
+    width: 74,
   },
-  brandAccent: {
-    color: Colors.brand.cyan,
+  activeCircle: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primary,
+    borderColor: Colors.surface.layer2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 4,
+    height: 56,
+    justifyContent: 'center',
+    left: -28,
+    position: 'absolute',
+    top: -4,
+    width: 56,
+  },
+  tabButton: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: Layout.tabBarHeight + Spacing[2],
+    minWidth: 44,
+    zIndex: 2,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
   },
   pressed: {
     opacity: 0.7,
   },
-  tabButtonView: {
-    borderRadius: BorderRadius.sm,
-    gap: 2,
-    minHeight: 44,
-    minWidth: 76,
-    paddingHorizontal: Spacing[1],
-    paddingVertical: Spacing[1],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabButtonSelected: {
-    backgroundColor: Colors.accent.primaryMuted,
-    borderColor: Colors.accent.primaryBorder,
-    borderWidth: 1,
-  },
   tabIcon: {
     fontSize: 16,
-    lineHeight: 18,
+    fontWeight: '800',
+    lineHeight: 20,
   },
-  tabIconInactive: {
-    opacity: 0.35,
+  activeIcon: {
+    color: Colors.surface.base,
   },
-  tabText: {
-    color: Colors.text.muted,
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  tabTextSelected: {
-    color: Colors.accent.primary,
+  inactiveIcon: {
+    color: Colors.text.primary,
   },
 });
