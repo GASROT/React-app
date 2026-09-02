@@ -1,6 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { Image } from 'expo-image';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +11,7 @@ import { PriceDisplay } from '@/features/catalog/components/price-display';
 import { ProductBadge } from '@/features/catalog/components/product-badge';
 import { StockIndicator } from '@/features/catalog/components/stock-indicator';
 import { categoryLabels, type Product } from '@/features/catalog/data/products';
+import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 
 const paymentOptions = [
@@ -41,6 +43,7 @@ type PixSimulation = {
 export function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
   const { addProduct, getQuantity, loading: cartLoading, removeProduct } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [activeMediaId, setActiveMediaId] = useState<string | undefined>();
@@ -49,13 +52,15 @@ export function ProductDetailScreen() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [pixSimulation, setPixSimulation] = useState<PixSimulation | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
+  const [failedMediaUrl, setFailedMediaUrl] = useState<string | null>(null);
   const cartActionInProgress = useRef(false);
   const activeMedia =
     product?.media.find((media) => media.id === activeMediaId) ?? product?.media[0];
   const unavailable = product?.stock === 0;
   const addedToCart = product ? getQuantity(product.id) > 0 : false;
+  const isAdmin = user?.role === 'ADMIN';
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let mounted = true;
 
     if (!id) return undefined;
@@ -77,7 +82,7 @@ export function ProductDetailScreen() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id]));
   const navigateBack = () => {
     if (router.canGoBack()) {
       router.back();
@@ -210,7 +215,21 @@ export function ProductDetailScreen() {
         <View style={styles.hero}>
           <View style={styles.productPhoto}>
             <Text style={styles.mediaKind}>{activeMedia?.type === 'video' ? 'VIDEO' : 'FOTO'}</Text>
-            <Text style={styles.marker}>{product.marker}</Text>
+            {activeMedia?.type === 'image' &&
+            activeMedia.url &&
+            failedMediaUrl !== activeMedia.url ? (
+              <Image
+                accessibilityLabel={`Imagem de ${product.name}`}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                onError={() => setFailedMediaUrl(activeMedia.url ?? null)}
+                source={{ uri: activeMedia.url }}
+                style={styles.productImage}
+                transition={150}
+              />
+            ) : (
+              <Text style={styles.marker}>{product.marker}</Text>
+            )}
             <Text style={styles.mediaTitle}>{activeMedia?.title}</Text>
             {activeMedia?.type === 'video' ? <Text style={styles.playButton}>▶</Text> : null}
           </View>
@@ -293,7 +312,7 @@ export function ProductDetailScreen() {
             </View>
           </View>
 
-          <View style={styles.paymentStack}>
+          {!isAdmin ? <View style={styles.paymentStack}>
             <Text style={styles.sectionTitle}>Formas de pagamento</Text>
             {paymentOptions.map((option) => (
               <View key={option.title} style={styles.paymentCard}>
@@ -367,7 +386,7 @@ export function ProductDetailScreen() {
                 </Pressable>
               </View>
             ) : null}
-          </View>
+          </View> : null}
 
           {actionFeedback ? (
             <Text accessibilityLiveRegion="polite" style={styles.actionFeedback}>
@@ -392,29 +411,41 @@ export function ProductDetailScreen() {
 
       {product ? (
         <View style={styles.footer}>
-        <Pressable
-          accessibilityLabel={
-            addedToCart ? 'Remover produto do carrinho' : 'Adicionar produto ao carrinho'
-          }
-          accessibilityRole="button"
-          accessibilityState={{ disabled: unavailable || addingToCart, selected: addedToCart }}
-          disabled={unavailable || addingToCart}
-          onPress={toggleCurrentProductInCart}
-          style={[
-            styles.cta,
-            addedToCart && styles.ctaAdded,
-            (unavailable || addingToCart) && styles.ctaDisabled,
-          ]}>
-          <Text style={styles.ctaText}>
-            {unavailable
-              ? 'Avisar quando disponivel'
-                : addingToCart
-                ? 'Atualizando carrinho...'
-                : addedToCart
-                  ? 'Adicionado'
-                  : 'Adicionar ao carrinho'}
-          </Text>
-        </Pressable>
+        {isAdmin ? (
+          <Pressable
+            accessibilityLabel={`Editar ${product.name}`}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({ pathname: '/products/[id]/edit' as never, params: { id: product.id } })
+            }
+            style={styles.cta}>
+            <Text style={styles.ctaText}>Editar</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityLabel={
+              addedToCart ? 'Remover produto do carrinho' : 'Adicionar produto ao carrinho'
+            }
+            accessibilityRole="button"
+            accessibilityState={{ disabled: unavailable || addingToCart, selected: addedToCart }}
+            disabled={unavailable || addingToCart}
+            onPress={toggleCurrentProductInCart}
+            style={[
+              styles.cta,
+              addedToCart && styles.ctaAdded,
+              (unavailable || addingToCart) && styles.ctaDisabled,
+            ]}>
+            <Text style={styles.ctaText}>
+              {unavailable
+                ? 'Avisar quando disponivel'
+                  : addingToCart
+                    ? 'Atualizando carrinho...'
+                    : addedToCart
+                      ? 'Adicionado'
+                      : 'Adicionar ao carrinho'}
+            </Text>
+          </Pressable>
+        )}
       </View>
       ) : null}
     </SafeAreaView>
@@ -518,6 +549,7 @@ const styles = StyleSheet.create({
     top: Spacing[3],
   },
   marker: { color: Colors.brand.cyan, fontSize: 62, fontWeight: '900' },
+  productImage: { height: '100%', width: '100%' },
   mediaTitle: {
     color: Colors.text.primary,
     fontSize: 18,
@@ -653,7 +685,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing[2],
   },
   paymentButtonText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
@@ -734,5 +766,5 @@ const styles = StyleSheet.create({
   },
   ctaDisabled: { backgroundColor: Colors.surface.layer3 },
   ctaAdded: { backgroundColor: Colors.feedback.success },
-  ctaText: { color: Colors.white, fontSize: 14, fontWeight: '900' },
+  ctaText: { color: Colors.text.inverse, fontSize: 14, fontWeight: '900' },
 });

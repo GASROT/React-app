@@ -14,10 +14,11 @@ export type Product = {
   category: ProductCategory;
   subcategory: string;
   npk?: string;
-  unit: string;
+  unit: 'kg' | 'L' | 'sc' | 'un';
   packageSize: string;
   price: number;
   oldPrice?: number;
+  pmf?: number;
   rating: number;
   reviews: number;
   stock: number;
@@ -26,11 +27,14 @@ export type Product = {
   description: string;
   application: string;
   technicalSheetUrl: string;
+  seasonalStartsAt?: string;
+  seasonalEndsAt?: string;
   wholesalePrice?: number;
   media: {
     id: string;
     type: 'image' | 'video';
     title: string;
+    url?: string;
   }[];
   mapa?: string;
   toxicClass?: 'I' | 'II' | 'III' | 'IV';

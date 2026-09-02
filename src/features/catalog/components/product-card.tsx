@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { Image } from 'expo-image';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useCart } from '@/features/cart/store/cart.store';
+import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
 import { categoryLabels, type Product } from '../data/products';
@@ -17,12 +19,14 @@ type Props = {
 
 export function ProductCard({ product, compact = false }: Props) {
   const router = useRouter();
+  const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
   const { addProduct, getQuantity, loading, removeProduct } = useCart();
   const [updatingCart, setUpdatingCart] = useState(false);
   const cartActionInProgress = useRef(false);
   const unavailable = product.stock === 0;
   const quantity = getQuantity(product.id);
   const added = quantity > 0;
+  const isAdmin = user?.role === 'ADMIN';
   const cartButtonDisabled = unavailable || loading || updatingCart;
   const openProduct = () => {
     router.push({ pathname: '/products/[id]', params: { id: product.id } });
@@ -46,6 +50,14 @@ export function ProductCard({ product, compact = false }: Props) {
       setUpdatingCart(false);
     }
   };
+  const handlePrimaryAction = () => {
+    if (isAdmin) {
+      router.push({ pathname: '/products/[id]/edit' as never, params: { id: product.id } });
+      return;
+    }
+
+    void toggleCart();
+  };
 
   if (compact) {
     return (
@@ -66,25 +78,44 @@ export function ProductCard({ product, compact = false }: Props) {
           <Text style={styles.compactPriceText}>{formatCurrency(product.price)}</Text>
           <Pressable
             accessibilityLabel={
-              added ? `Remover ${product.name} do carrinho` : `Adicionar ${product.name} ao carrinho`
+              isAdmin
+                ? `Editar ${product.name}`
+                : added
+                  ? `Remover ${product.name} do carrinho`
+                  : `Adicionar ${product.name} ao carrinho`
             }
             accessibilityRole="button"
-            accessibilityState={{ disabled: cartButtonDisabled, selected: added }}
-            disabled={cartButtonDisabled}
-            onPress={() => void toggleCart()}
+            accessibilityState={{
+              disabled: !isAdmin && cartButtonDisabled,
+              selected: !isAdmin && added,
+            }}
+            disabled={!isAdmin && cartButtonDisabled}
+            onPress={(event) => {
+              event.stopPropagation();
+              handlePrimaryAction();
+            }}
             style={[
               styles.compactAddButton,
-              added && styles.addedButton,
-              cartButtonDisabled && styles.disabledButton,
+              isAdmin && styles.adminButton,
+              !isAdmin && added && styles.addedButton,
+              !isAdmin && cartButtonDisabled && styles.disabledButton,
             ]}>
-            <Text style={[styles.compactAddText, added && styles.addedButtonText, unavailable && styles.disabledText]}>
-              {unavailable
-                ? 'Avise-me'
-                : updatingCart
-                  ? 'Atualizando...'
-                  : added
-                    ? 'Adicionado'
-                    : 'Adicionar'}
+            <Text
+              style={[
+                styles.compactAddText,
+                isAdmin && styles.adminButtonText,
+                !isAdmin && added && styles.addedButtonText,
+                !isAdmin && unavailable && styles.disabledText,
+              ]}>
+              {isAdmin
+                ? 'Editar'
+                : unavailable
+                  ? 'Avise-me'
+                  : updatingCart
+                    ? 'Atualizando...'
+                    : added
+                      ? 'Adicionado'
+                      : 'Adicionar'}
             </Text>
           </Pressable>
         </View>
@@ -118,25 +149,44 @@ export function ProductCard({ product, compact = false }: Props) {
         <PriceDisplay price={product.price} oldPrice={product.oldPrice} />
         <Pressable
           accessibilityLabel={
-            added ? `Remover ${product.name} do carrinho` : `Adicionar ${product.name} ao carrinho`
+            isAdmin
+              ? `Editar ${product.name}`
+              : added
+                ? `Remover ${product.name} do carrinho`
+                : `Adicionar ${product.name} ao carrinho`
           }
           accessibilityRole="button"
-          accessibilityState={{ disabled: cartButtonDisabled, selected: added }}
-          disabled={cartButtonDisabled}
-          onPress={() => void toggleCart()}
+          accessibilityState={{
+            disabled: !isAdmin && cartButtonDisabled,
+            selected: !isAdmin && added,
+          }}
+          disabled={!isAdmin && cartButtonDisabled}
+          onPress={(event) => {
+            event.stopPropagation();
+            handlePrimaryAction();
+          }}
           style={[
             styles.addButton,
-            added && styles.addedButton,
-            cartButtonDisabled && styles.disabledButton,
+            isAdmin && styles.adminButton,
+            !isAdmin && added && styles.addedButton,
+            !isAdmin && cartButtonDisabled && styles.disabledButton,
           ]}>
-          <Text style={[styles.addButtonText, added && styles.addedButtonText, unavailable && styles.disabledText]}>
-            {unavailable
-              ? 'Avisar quando disponivel'
-              : updatingCart
-                ? 'Atualizando...'
-                : added
-                  ? 'Adicionado'
-                  : '+ Carrinho'}
+          <Text
+            style={[
+              styles.addButtonText,
+              isAdmin && styles.adminButtonText,
+              !isAdmin && added && styles.addedButtonText,
+              !isAdmin && unavailable && styles.disabledText,
+            ]}>
+            {isAdmin
+              ? 'Editar'
+              : unavailable
+                ? 'Avisar quando disponivel'
+                : updatingCart
+                  ? 'Atualizando...'
+                  : added
+                    ? 'Adicionado'
+                    : '+ Carrinho'}
           </Text>
         </Pressable>
       </View>
@@ -146,10 +196,25 @@ export function ProductCard({ product, compact = false }: Props) {
 
 function ProductMarker({ product, size }: { product: Product; size: number }) {
   const color = Colors.category[product.category];
+  const imageUrl = product.media.find((media) => media.type === 'image' && media.url)?.url;
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const showImage = Boolean(imageUrl && failedImageUrl !== imageUrl);
 
   return (
     <View style={[styles.marker, { height: size, width: size, borderColor: `${color}55` }]}>
-      <Text style={[styles.markerText, { color }]}>{product.marker}</Text>
+      {showImage && imageUrl ? (
+        <Image
+          accessibilityLabel={`Imagem de ${product.name}`}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          onError={() => setFailedImageUrl(imageUrl)}
+          source={{ uri: imageUrl }}
+          style={styles.markerImage}
+          transition={150}
+        />
+      ) : (
+        <Text style={[styles.markerText, { color }]}>{product.marker}</Text>
+      )}
     </View>
   );
 }
@@ -207,6 +272,11 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '900',
   },
+  markerImage: {
+    borderRadius: BorderRadius.md,
+    height: '100%',
+    width: '100%',
+  },
   body: {
     gap: Spacing[1],
     padding: Layout.cardPadding,
@@ -255,6 +325,13 @@ const styles = StyleSheet.create({
   },
   addedButtonText: {
     color: Colors.surface.base,
+  },
+  adminButton: {
+    backgroundColor: Colors.accent.primary,
+    borderColor: Colors.accent.primary,
+  },
+  adminButtonText: {
+    color: Colors.text.inverse,
   },
   disabledButton: {
     backgroundColor: Colors.surface.layer3,

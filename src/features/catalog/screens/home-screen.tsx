@@ -1,7 +1,10 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
+  AccessibilityInfo,
+  Animated,
   FlatList,
   Pressable,
   ScrollView,
@@ -25,6 +28,7 @@ import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 
 const categories = Object.keys(categoryLabels) as ProductCategory[];
+const BANNER_AUTO_ROTATION_MS = 5000;
 
 export function HomeScreen() {
   const router = useRouter();
@@ -32,10 +36,70 @@ export function HomeScreen() {
   const [homeProducts, setHomeProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<HeroBannerData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const { width } = useWindowDimensions();
-  const bannerWidth = Math.min(width - Layout.screenPaddingH * 2, 768);
+  const bannerGap = Spacing[2];
+  const bannerWidth = Math.min(Math.max(width * 0.75, 248), 780);
+  const bannerSidePadding = Math.max((width - bannerWidth) / 2, Layout.screenPaddingH);
+  const bannerSnapInterval = bannerWidth + bannerGap;
+  const bannerListRef = useRef<FlatList<HeroBannerData>>(null);
+  const activeBannerRef = useRef(0);
+  const isDraggingBannerRef = useRef(false);
+  const [scrollX] = useState(() => new Animated.Value(0));
+
+  const selectBanner = useCallback((index: number) => {
+    activeBannerRef.current = index;
+    setActiveBanner(index);
+  }, []);
+
+  const scrollToBanner = useCallback((index: number) => {
+    if (banners.length === 0) return;
+
+    const nextIndex = (index + banners.length) % banners.length;
+    selectBanner(nextIndex);
+    bannerListRef.current?.scrollToOffset({
+      animated: !reduceMotion,
+      offset: nextIndex * bannerSnapInterval,
+    });
+  }, [bannerSnapInterval, banners.length, reduceMotion, selectBanner]);
 
   useEffect(() => {
+    let mounted = true;
+
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    bannerListRef.current?.scrollToOffset({
+      animated: false,
+      offset: activeBannerRef.current * bannerSnapInterval,
+    });
+  }, [bannerSnapInterval]);
+
+  useFocusEffect(useCallback(() => {
+    if (banners.length < 2 || reduceMotion) return undefined;
+
+    const timer = setInterval(() => {
+      if (!isDraggingBannerRef.current) {
+        scrollToBanner(activeBannerRef.current + 1);
+      }
+    }, BANNER_AUTO_ROTATION_MS);
+
+    return () => clearInterval(timer);
+  }, [banners.length, reduceMotion, scrollToBanner]));
+
+  useFocusEffect(useCallback(() => {
     let mounted = true;
 
     Promise.all([listProducts(), getFeaturedBanners()])
@@ -44,6 +108,9 @@ export function HomeScreen() {
         setError(null);
         setHomeProducts(productResponse.data);
         setBanners(bannerResponse);
+        if (activeBannerRef.current >= bannerResponse.length) {
+          selectBanner(0);
+        }
       })
       .catch(() => {
         if (!mounted) return;
@@ -55,7 +122,7 @@ export function HomeScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [selectBanner]));
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -69,25 +136,116 @@ export function HomeScreen() {
 
         {banners.length > 0 ? (
           <View style={styles.carouselBlock}>
-            <FlatList
+            <Animated.FlatList
+              ref={bannerListRef}
+              contentContainerStyle={{ paddingHorizontal: bannerSidePadding }}
               data={banners}
               decelerationRate="fast"
+              getItemLayout={(_, index) => ({
+                index,
+                length: bannerSnapInterval,
+                offset: bannerSnapInterval * index,
+              })}
               horizontal
+              ItemSeparatorComponent={() => <View style={{ width: bannerGap }} />}
               keyExtractor={(item) => item.id}
               onMomentumScrollEnd={(event) => {
-                setActiveBanner(Math.round(event.nativeEvent.contentOffset.x / bannerWidth));
+                const index = Math.min(
+                  Math.max(Math.round(event.nativeEvent.contentOffset.x / bannerSnapInterval), 0),
+                  banners.length - 1,
+                );
+                isDraggingBannerRef.current = false;
+                selectBanner(index);
               }}
-              pagingEnabled
-              renderItem={({ item }) => <HeroBanner banner={item} width={bannerWidth} />}
+              onMomentumScrollBegin={() => {
+                isDraggingBannerRef.current = true;
+              }}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                { useNativeDriver: true },
+              )}
+              onScrollBeginDrag={() => {
+                isDraggingBannerRef.current = true;
+              }}
+              onScrollEndDrag={() => {
+                isDraggingBannerRef.current = false;
+              }}
+              removeClippedSubviews={false}
+              renderItem={({ item, index }) => {
+                const isActive = index === activeBanner;
+                const inputRange = [
+                  (index - 1) * bannerSnapInterval,
+                  index * bannerSnapInterval,
+                  (index + 1) * bannerSnapInterval,
+                ];
+                const opacity = reduceMotion
+                  ? (isActive ? 1 : 0.72)
+                  : scrollX.interpolate({
+                      extrapolate: 'clamp',
+                      inputRange,
+                      outputRange: [0.72, 1, 0.72],
+                    });
+                const scaleX = reduceMotion
+                  ? (isActive ? 1.04 : 0.84)
+                  : scrollX.interpolate({
+                      extrapolate: 'clamp',
+                      inputRange,
+                      outputRange: [0.84, 1.04, 0.84],
+                    });
+                const scaleY = reduceMotion
+                  ? (isActive ? 1 : 0.9)
+                  : scrollX.interpolate({
+                      extrapolate: 'clamp',
+                      inputRange,
+                      outputRange: [0.9, 1, 0.9],
+                    });
+                const translateX = reduceMotion
+                  ? (isActive ? 0 : index < activeBanner ? bannerWidth * 0.07 : -bannerWidth * 0.07)
+                  : scrollX.interpolate({
+                      extrapolate: 'clamp',
+                      inputRange,
+                      outputRange: [-bannerWidth * 0.07, 0, bannerWidth * 0.07],
+                    });
+                const translateY = reduceMotion
+                  ? (isActive ? 0 : 12)
+                  : scrollX.interpolate({
+                      extrapolate: 'clamp',
+                      inputRange,
+                      outputRange: [12, 0, 12],
+                    });
+
+                return (
+                  <Animated.View
+                    style={{
+                      opacity,
+                      transform: [{ translateX }, { scaleX }, { scaleY }, { translateY }],
+                      width: bannerWidth,
+                      zIndex: isActive ? 2 : 1,
+                    }}>
+                    <HeroBanner
+                      banner={item}
+                      compact={bannerWidth < 420}
+                      selected={isActive}
+                    />
+                  </Animated.View>
+                );
+              }}
+              scrollEventThrottle={16}
               showsHorizontalScrollIndicator={false}
-              snapToInterval={bannerWidth}
+              snapToAlignment="start"
+              snapToInterval={bannerSnapInterval}
             />
             <View style={styles.dots}>
               {banners.map((banner, index) => (
-                <View
+                <Pressable
+                  accessibilityLabel={`Exibir banner ${index + 1} de ${banners.length}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: index === activeBanner }}
                   key={banner.id}
-                  style={[styles.dot, index === activeBanner && styles.dotActive]}
-                />
+                  onPress={() => scrollToBanner(index)}
+                  style={styles.dotTouch}>
+                  <View style={[styles.dot, index === activeBanner && styles.dotActive]} />
+                </Pressable>
               ))}
             </View>
           </View>
@@ -131,35 +289,67 @@ export function HomeScreen() {
 
 function HeroBanner({
   banner,
-  width,
+  compact,
+  selected,
 }: {
   banner: HeroBannerData;
-  width: number;
+  compact: boolean;
+  selected: boolean;
 }) {
   const router = useRouter();
 
   return (
     <Pressable
+      accessibilityLabel={`${banner.title}. ${banner.subtitle}`}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
       onPress={() => router.push({ pathname: '/products/[id]', params: { id: banner.product.id } })}
-      style={[styles.hero, { width }]}>
+      style={[styles.hero, compact && styles.heroCompact]}>
       <View style={styles.heroCopy}>
-        <Text style={styles.overline}>Destaque Steam Sale</Text>
-        <Text style={styles.heroTitle}>{banner.title}</Text>
-        <Text style={styles.heroSub}>{banner.subtitle}</Text>
+        <Text style={styles.overline}>Destaque AgroShop Sale</Text>
+        <Text
+          numberOfLines={2}
+          style={[styles.heroTitle, compact && styles.heroTitleCompact]}>
+          {banner.title}
+        </Text>
+        <Text numberOfLines={2} style={styles.heroSub}>{banner.subtitle}</Text>
         <PriceDisplay oldPrice={banner.product.oldPrice} price={banner.product.price} size="lg" />
         <View style={styles.heroActions}>
           <Text style={styles.bannerTag}>{banner.tag}</Text>
           <Text style={styles.primaryButtonText}>Ver oferta</Text>
         </View>
       </View>
-      <View style={styles.heroMetric}>
-        <Text style={styles.heroMarker}>{banner.product.marker}</Text>
-        <Text style={styles.heroMetricLabel}>
-          {banner.product.npk ? `NPK ${banner.product.npk}` : banner.product.subcategory}
+      <HeroProductVisual compact={compact} product={banner.product} />
+    </Pressable>
+  );
+}
+
+function HeroProductVisual({ compact, product }: { compact: boolean; product: Product }) {
+  const imageUrl = product.media.find((media) => media.type === 'image' && media.url)?.url;
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const showImage = Boolean(imageUrl && failedImageUrl !== imageUrl);
+
+  return (
+    <View style={[styles.heroVisual, compact && styles.heroVisualCompact]}>
+      {showImage && imageUrl ? (
+        <Image
+          accessibilityLabel={`Imagem de ${product.name}`}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          onError={() => setFailedImageUrl(imageUrl)}
+          source={{ uri: imageUrl }}
+          style={styles.heroProductImage}
+          transition={150}
+        />
+      ) : (
+        <Text style={styles.heroMarker}>{product.marker}</Text>
+      )}
+      <View style={styles.heroVisualLabel}>
+        <Text numberOfLines={1} style={styles.heroMetricLabel}>
+          {product.npk ? `NPK ${product.npk}` : product.subcategory}
         </Text>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -254,7 +444,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   logoAccent: {
-    color: Colors.brand.cyan,
+    color: Colors.accent.primary,
   },
   headerActions: {
     flexDirection: 'row',
@@ -306,7 +496,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.surface.base,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 9,
     fontWeight: '900',
     height: 16,
@@ -346,10 +536,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: Spacing[4],
-    minHeight: 180,
+    height: 220,
     overflow: 'hidden',
     padding: Layout.cardPaddingLg,
+    width: '100%',
     ...Shadows.card,
+  },
+  heroCompact: {
+    height: 236,
   },
   heroCopy: {
     flex: 1,
@@ -367,6 +561,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 28,
+  },
+  heroTitleCompact: {
+    fontSize: 20,
+    lineHeight: 24,
   },
   heroSub: {
     color: Colors.text.secondary,
@@ -395,7 +593,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing[0.5],
   },
   primaryButtonText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 13,
     fontWeight: '900',
   },
@@ -403,7 +601,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexDirection: 'row',
     gap: Spacing[1],
-    marginTop: Spacing[2],
+  },
+  dotTouch: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
   },
   dot: {
     backgroundColor: Colors.border.strong,
@@ -415,26 +617,46 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent.primary,
     width: 36,
   },
-  heroMetric: {
+  heroVisual: {
     alignItems: 'center',
-    backgroundColor: Colors.brand.cyanMuted,
+    backgroundColor: Colors.surface.layer3,
     borderColor: Colors.brand.cyanBorder,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    height: 112,
+    height: 148,
     justifyContent: 'center',
-    width: 96,
+    overflow: 'hidden',
+    position: 'relative',
+    width: 124,
+  },
+  heroVisualCompact: {
+    height: 116,
+    width: 76,
+  },
+  heroProductImage: {
+    height: '100%',
+    width: '100%',
   },
   heroMarker: {
     color: Colors.brand.cyan,
-    fontSize: 34,
+    fontSize: 36,
     fontWeight: '900',
   },
+  heroVisualLabel: {
+    backgroundColor: Colors.surface.overlay,
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: Spacing[1],
+    paddingVertical: Spacing[1],
+    position: 'absolute',
+    right: 0,
+  },
   heroMetricLabel: {
-    color: Colors.text.secondary,
-    fontSize: 11,
+    color: Colors.text.primary,
+    fontSize: 10,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
+    textAlign: 'center',
   },
   sectionHeader: {
     alignItems: 'center',

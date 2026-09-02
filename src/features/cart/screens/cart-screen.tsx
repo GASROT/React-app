@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { confirmOrder } from '@/features/checkout/api/checkout.api';
 import { replaceCart, useCart } from '@/features/cart/store/cart.store';
 import { addRecentOrder } from '@/features/orders/store/recent-orders.store';
+import { ProductThumbnail } from '@/shared/components/product-thumbnail';
+import { getCurrentUser } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
 
@@ -17,6 +19,15 @@ export function CartScreen() {
 
   const finishCheckout = async () => {
     if (checkoutDisabled) return;
+
+    if (!getCurrentUser()) {
+      setCheckoutError(null);
+      router.push({
+        pathname: '/(tabs)/profile',
+        params: { notice: 'checkout-auth-required' },
+      });
+      return;
+    }
 
     try {
       setCheckoutError(null);
@@ -74,9 +85,12 @@ export function CartScreen() {
 
               return (
                 <View key={product.id} style={styles.item}>
-                  <View style={styles.marker}>
-                    <Text style={styles.markerText}>{product.marker}</Text>
-                  </View>
+                  <ProductThumbnail
+                    marker={product.marker}
+                    media={product.media}
+                    name={product.name}
+                    size={56}
+                  />
                   <View style={styles.info}>
                     <Text numberOfLines={2} style={styles.itemName}>
                       {product.name} {product.packageSize}
@@ -245,19 +259,6 @@ const styles = StyleSheet.create({
     gap: Spacing[3],
     padding: Spacing[3],
   },
-  marker: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface.layer2,
-    borderRadius: BorderRadius.sm,
-    height: 56,
-    justifyContent: 'center',
-    width: 56,
-  },
-  markerText: {
-    color: Colors.brand.cyan,
-    fontSize: 17,
-    fontWeight: '900',
-  },
   info: {
     flex: 1,
     gap: Spacing[1],
@@ -391,7 +392,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   checkoutText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 14,
     fontWeight: '900',
   },

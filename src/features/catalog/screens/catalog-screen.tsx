@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,7 +19,7 @@ export function CatalogScreen() {
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let mounted = true;
 
     listProducts()
@@ -36,7 +37,7 @@ export function CatalogScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, []));
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
