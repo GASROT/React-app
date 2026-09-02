@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   segmentButtonTextActive: {
-    color: Colors.white,
+    color: Colors.text.inverse,
   },
   primaryButton: {
     alignItems: 'center',
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     minHeight: Layout.buttonHeightLg,
   },
   primaryButtonText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 14,
     fontWeight: '900',
   },

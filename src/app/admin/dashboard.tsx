@@ -13,7 +13,7 @@ import {
   type AdminOrder,
   type CreateAdminProductPayload,
 } from '@/shared/services/api/admin-api';
-import type { ProductCategory } from '@/features/catalog/data/products';
+import type { Product, ProductCategory } from '@/features/catalog/data/products';
 import type { OrderStatus } from '@/features/orders/data/orders';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
@@ -127,7 +127,7 @@ export default function AdminDashboardRoute() {
           <Field label="SKU" value={product.sku} onChangeText={(value) => setProduct({ ...product, sku: value })} />
           <View style={styles.inline}>
             <Field label="Categoria" value={product.category} onChangeText={(value) => setProduct({ ...product, category: value as ProductCategory })} />
-            <Field label="Unidade" value={product.unit} onChangeText={(value) => setProduct({ ...product, unit: value })} />
+            <Field label="Unidade" value={product.unit} onChangeText={(value) => setProduct({ ...product, unit: value as Product['unit'] })} />
           </View>
           <Field label="Subcategoria" value={product.subcategory} onChangeText={(value) => setProduct({ ...product, subcategory: value })} />
           <Field label="Embalagem" value={product.packageSize} onChangeText={(value) => setProduct({ ...product, packageSize: value })} />
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     minHeight: Layout.buttonHeightLg,
   },
   primaryButtonText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 13,
     fontWeight: '900',
   },
