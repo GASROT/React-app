@@ -7,10 +7,10 @@ export const Colors = {
     overlay: 'rgba(0, 0, 0, 0.72)',
   },
   accent: {
-    primary: '#1A9FFF',
-    primaryHover: '#3BAFFF',
-    primaryMuted: '#1A9FFF1A',
-    primaryBorder: '#1A9FFF40',
+    primary: '#2FBF71',
+    primaryHover: '#49D78B',
+    primaryMuted: '#2FBF711A',
+    primaryBorder: '#2FBF7160',
   },
   brand: {
     cyan: '#00C8D7',
@@ -22,7 +22,7 @@ export const Colors = {
     secondary: '#8F9BAD',
     muted: '#4F5D6E',
     inverse: '#0F1014',
-    link: '#1A9FFF',
+    link: '#2FBF71',
     price: '#EAF0FB',
     priceOld: '#4F5D6E',
     discount: '#4EE97B',
@@ -31,7 +31,7 @@ export const Colors = {
     subtle: '#1E2329',
     default: '#252D38',
     strong: '#2E3A4A',
-    accent: '#1A9FFF40',
+    accent: '#2FBF7160',
   },
   feedback: {
     success: '#4EE97B',
@@ -40,14 +40,14 @@ export const Colors = {
     warningMuted: '#FFB83018',
     error: '#FF4B55',
     errorMuted: '#FF4B5518',
-    info: '#1A9FFF',
-    infoMuted: '#1A9FFF18',
+    info: '#3B82F6',
+    infoMuted: '#3B82F618',
   },
   category: {
     fertilizante: '#00C8D7',
     defensivo: '#FF4B55',
     semente: '#4EE97B',
-    irrigacao: '#1A9FFF',
+    irrigacao: '#3B82F6',
     maquinario: '#FFB830',
     nutricao: '#A78BFA',
   },
@@ -55,4 +55,3 @@ export const Colors = {
   black: '#000000',
   transparent: 'transparent',
 } as const;
-

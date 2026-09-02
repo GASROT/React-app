@@ -26,6 +26,43 @@ function resolveApiBaseUrl() {
 
 export const apiBaseUrl = resolveApiBaseUrl();
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+function parseApiErrorMessage(body: string, status: number) {
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+
+    if (typeof parsed.message === 'string' && parsed.message.trim()) {
+      return parsed.message;
+    }
+
+    if (Array.isArray(parsed.message)) {
+      const messages = parsed.message.filter(
+        (message): message is string => typeof message === 'string' && Boolean(message.trim()),
+      );
+      if (messages.length > 0) return messages.join('\n');
+    }
+  } catch {
+    // Respostas fora do contrato nao sao exibidas para evitar vazar detalhes internos.
+  }
+
+  return `A API recusou a alteracao com o status HTTP ${status}.`;
+}
+
+export function getApiErrorMessage(error: unknown) {
+  if (error instanceof ApiError) return error.message;
+
+  return 'Nao foi possivel conectar a API. Verifique sua conexao e se o servidor esta disponivel.';
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -38,7 +75,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(body || `Falha HTTP ${response.status}`);
+    throw new ApiError(parseApiErrorMessage(body, response.status), response.status);
   }
 
   return response.json() as Promise<T>;

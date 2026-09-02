@@ -58,6 +58,38 @@ export type CreateAdminProductPayload = Pick<
   pmf?: number;
 };
 
+export type UpdateAdminProductPayload = Partial<
+  Pick<
+    Product,
+    | 'name'
+    | 'manufacturer'
+    | 'sku'
+    | 'category'
+    | 'subcategory'
+    | 'dosage'
+    | 'unit'
+    | 'packageSize'
+    | 'price'
+    | 'stock'
+    | 'minMultiple'
+    | 'technicalSheetUrl'
+    | 'description'
+    | 'application'
+    | 'marker'
+    | 'requiresAgronomistCpf'
+  >
+> & {
+  npk?: string | null;
+  oldPrice?: number | null;
+  pmf?: number | null;
+  wholesalePrice?: number | null;
+  mapa?: string | null;
+  toxicClass?: Product['toxicClass'] | null;
+  seasonalStartsAt?: string | null;
+  seasonalEndsAt?: string | null;
+  imageUrl?: string;
+};
+
 function adminHeaders(): Record<string, string> {
   const token = getAccessToken();
 
@@ -79,6 +111,14 @@ export function listAdminOrders() {
 export function createAdminProduct(payload: CreateAdminProductPayload) {
   return apiRequest<Product>('/admin/products', {
     method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminProduct(productId: string, payload: UpdateAdminProductPayload) {
+  return apiRequest<Product>(`/admin/products/${encodeURIComponent(productId)}`, {
+    method: 'PATCH',
     headers: adminHeaders(),
     body: JSON.stringify(payload),
   });

@@ -8,11 +8,10 @@ export const Shadows = {
     elevation: 3,
   },
   accentGlow: {
-    shadowColor: '#1A9FFF',
+    shadowColor: '#2FBF71',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 0,
   },
 } as const;
-
