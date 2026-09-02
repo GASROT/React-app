@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getOrder } from '@/features/orders/api/orders.api';
 import type { Order } from '@/features/orders/data/orders';
+import { ProductThumbnail } from '@/shared/components/product-thumbnail';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
 
@@ -101,9 +102,12 @@ export function OrderDetailScreen() {
                 router.push({ pathname: '/products/[id]', params: { id: item.product.id } })
               }
               style={styles.productRow}>
-              <View style={styles.productMarker}>
-                <Text style={styles.productMarkerText}>{item.product.marker}</Text>
-              </View>
+              <ProductThumbnail
+                marker={item.product.marker}
+                media={item.product.media}
+                name={item.product.name}
+                size={52}
+              />
               <View style={styles.productInfo}>
                 <Text style={styles.productName}>{item.product.name}</Text>
                 <Text style={styles.productMeta}>
@@ -246,15 +250,6 @@ const styles = StyleSheet.create({
     gap: Spacing[3],
     padding: Layout.cardPadding,
   },
-  productMarker: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface.layer2,
-    borderRadius: BorderRadius.sm,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  productMarkerText: { color: Colors.brand.cyan, fontSize: 16, fontWeight: '900' },
   productInfo: { flex: 1 },
   productName: { color: Colors.text.primary, fontSize: 14, fontWeight: '900' },
   productMeta: { color: Colors.text.secondary, fontSize: 12, marginTop: Spacing[1] },

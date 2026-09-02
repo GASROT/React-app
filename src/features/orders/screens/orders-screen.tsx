@@ -11,6 +11,7 @@ import {
   updateAdminOrderStatus,
   type AdminOrder,
 } from '@/shared/services/api/admin-api';
+import { ProductThumbnail } from '@/shared/components/product-thumbnail';
 import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 import { formatCurrency } from '@/shared/utils/currency';
@@ -144,11 +145,24 @@ export function OrdersScreen() {
                 {order.status}
               </Text>
             </View>
-            <Text style={styles.items}>
-              {(order.products ?? [])
-                .map((item) => `${item.quantity}x ${item.product.name} ${item.product.packageSize}`)
-                .join(', ')}
-            </Text>
+            <View style={styles.orderItemsPreview}>
+              <View style={styles.orderThumbnails}>
+                {(order.products ?? []).slice(0, 2).map((item) => (
+                  <ProductThumbnail
+                    key={item.product.id}
+                    marker={item.product.marker}
+                    media={item.product.media}
+                    name={item.product.name}
+                    size={44}
+                  />
+                ))}
+              </View>
+              <Text numberOfLines={3} style={styles.items}>
+                {(order.products ?? [])
+                  .map((item) => `${item.quantity}x ${item.product.name} ${item.product.packageSize}`)
+                  .join(', ')}
+              </Text>
+            </View>
             <View style={styles.detailGrid}>
               <Info label="Pagamento" value={order.paymentMethod} />
               <Info label="Entrega" value={order.shippingMethod} />
@@ -190,7 +204,7 @@ function mapAdminOrder(order: AdminOrder): Order {
       sku: item.product.sku,
       category: 'fertilizante' as const,
       subcategory: 'Pedido',
-      unit: 'un',
+      unit: 'un' as const,
       packageSize: item.product.packageSize,
       price: 0,
       rating: 0,
@@ -313,7 +327,17 @@ const styles = StyleSheet.create({
   },
   items: {
     color: Colors.text.secondary,
+    flex: 1,
     fontSize: 13,
+  },
+  orderItemsPreview: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing[2],
+  },
+  orderThumbnails: {
+    flexDirection: 'row',
+    gap: Spacing[1],
   },
   detailGrid: {
     borderColor: Colors.border.default,
@@ -372,7 +396,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing[3],
   },
   adminActionText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 12,
     fontWeight: '900',
   },

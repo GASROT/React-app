@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,7 +16,9 @@ const options = [
 
 export function ProfileScreen() {
   const router = useRouter();
-  const [user, setUser] = useState<LoginResponse['user'] | null>(null);
+  const params = useLocalSearchParams<{ notice?: string }>();
+  const [user, setUser] = useState<LoginResponse['user'] | null>(() => getCurrentUser());
+  const showCheckoutAuthNotice = !user && params.notice === 'checkout-auth-required';
 
   useFocusEffect(
     useCallback(() => {
@@ -40,6 +42,14 @@ export function ProfileScreen() {
         </View>
 
         <View style={styles.panel}>
+          {showCheckoutAuthNotice ? (
+            <Text
+              accessibilityLiveRegion="assertive"
+              accessibilityRole="alert"
+              style={styles.authNotice}>
+              Você precisa estar logado para comprar algum item.
+            </Text>
+          ) : null}
           <Text style={styles.panelTitle}>Conta AgroShop</Text>
           <Pressable
             accessibilityRole="button"
@@ -122,7 +132,7 @@ const styles = StyleSheet.create({
     minHeight: Layout.buttonHeightLg,
   },
   primaryActionText: {
-    color: Colors.white,
+    color: Colors.text.inverse,
     fontSize: 14,
     fontWeight: '900',
   },
@@ -210,6 +220,17 @@ const styles = StyleSheet.create({
   panel: {
     gap: Spacing[2],
     padding: Layout.screenPaddingH,
+  },
+  authNotice: {
+    backgroundColor: Colors.feedback.warningMuted,
+    borderColor: Colors.feedback.warning,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    color: Colors.feedback.warning,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    padding: Spacing[3],
   },
   panelTitle: {
     color: Colors.text.primary,
