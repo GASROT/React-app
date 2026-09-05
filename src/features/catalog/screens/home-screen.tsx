@@ -25,6 +25,12 @@ import {
   type ProductCategory,
 } from '@/features/catalog/data/products';
 import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
+import {
+  getExperimentSubjectId,
+  getExperimentVariant,
+  HOME_HERO_CTA_EXPERIMENT,
+  trackExperimentEvent,
+} from '@/shared/services/experiments/experiments';
 import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 
 const categories = Object.keys(categoryLabels) as ProductCategory[];
@@ -32,6 +38,10 @@ const BANNER_AUTO_ROTATION_MS = 5000;
 
 export function HomeScreen() {
   const router = useRouter();
+  const [heroExperiment] = useState(() => {
+    const subjectId = getExperimentSubjectId(getCurrentUser()?.id);
+    return { subjectId, ...getExperimentVariant(HOME_HERO_CTA_EXPERIMENT, subjectId) };
+  });
   const [activeBanner, setActiveBanner] = useState(0);
   const [homeProducts, setHomeProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<HeroBannerData[]>([]);
@@ -123,6 +133,17 @@ export function HomeScreen() {
       mounted = false;
     };
   }, [selectBanner]));
+
+  useEffect(() => {
+    if (banners.length === 0) return;
+
+    trackExperimentEvent(
+      HOME_HERO_CTA_EXPERIMENT,
+      heroExperiment.variant,
+      heroExperiment.subjectId,
+      'exposure',
+    );
+  }, [banners.length, heroExperiment]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -224,7 +245,16 @@ export function HomeScreen() {
                     }}>
                     <HeroBanner
                       banner={item}
+                      ctaLabel={heroExperiment.value.ctaLabel}
                       compact={bannerWidth < 420}
+                      onConversion={() =>
+                        trackExperimentEvent(
+                          HOME_HERO_CTA_EXPERIMENT,
+                          heroExperiment.variant,
+                          heroExperiment.subjectId,
+                          'conversion',
+                        )
+                      }
                       selected={isActive}
                     />
                   </Animated.View>
@@ -289,11 +319,15 @@ export function HomeScreen() {
 
 function HeroBanner({
   banner,
+  ctaLabel,
   compact,
+  onConversion,
   selected,
 }: {
   banner: HeroBannerData;
+  ctaLabel: string;
   compact: boolean;
+  onConversion: () => void;
   selected: boolean;
 }) {
   const router = useRouter();
@@ -303,7 +337,10 @@ function HeroBanner({
       accessibilityLabel={`${banner.title}. ${banner.subtitle}`}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      onPress={() => router.push({ pathname: '/products/[id]', params: { id: banner.product.id } })}
+      onPress={() => {
+        onConversion();
+        router.push({ pathname: '/products/[id]', params: { id: banner.product.id } });
+      }}
       style={[styles.hero, compact && styles.heroCompact]}>
       <View style={styles.heroCopy}>
         <Text style={styles.overline}>Destaque AgroShop Sale</Text>
@@ -316,7 +353,7 @@ function HeroBanner({
         <PriceDisplay oldPrice={banner.product.oldPrice} price={banner.product.price} size="lg" />
         <View style={styles.heroActions}>
           <Text style={styles.bannerTag}>{banner.tag}</Text>
-          <Text style={styles.primaryButtonText}>Ver oferta</Text>
+          <Text style={styles.primaryButtonText}>{ctaLabel}</Text>
         </View>
       </View>
       <HeroProductVisual compact={compact} product={banner.product} />
