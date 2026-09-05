@@ -7,10 +7,11 @@ import {
   Tabs,
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
-import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Easing,
   LayoutChangeEvent,
   Pressable,
   StyleSheet,
@@ -20,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getAppTabsForRole, type AppTabConfig } from '@/components/app-tabs.config';
 import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
-import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
+import { BorderRadius, Colors, Layout, Shadows, Spacing } from '@/shared/theme';
 
 type FluidNavigationContextValue = {
   activeX: Animated.Value;
@@ -29,6 +30,14 @@ type FluidNavigationContextValue = {
 };
 
 const FluidNavigationContext = createContext<FluidNavigationContextValue | null>(null);
+
+const ACTIVE_ICON_OFFSET_Y = 8;
+const ACTIVE_INDICATOR_SIZE = 56;
+const ACTIVE_DASH_HEIGHT = 4;
+const ACTIVE_DASH_WIDTH = 32;
+const INDICATOR_MOVE_DURATION = 135;
+const ICON_ARRIVAL_DELAY = 160;
+const ICON_SETTLE_DURATION = 90;
 
 export default function AppTabs() {
   const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
@@ -77,13 +86,19 @@ function TabButton({ index, isFocused, tab, ...props }: TabButtonProps) {
       return;
     }
 
-    Animated.spring(iconProgress, {
+    const settle = Animated.timing(iconProgress, {
       toValue: isFocused ? 1 : 0,
-      damping: 17,
-      mass: 0.7,
-      stiffness: 190,
+      duration: isFocused ? ICON_SETTLE_DURATION : 70,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
+    });
+    const animation = isFocused
+      ? Animated.sequence([Animated.delay(ICON_ARRIVAL_DELAY), settle])
+      : settle;
+
+    animation.start();
+
+    return () => animation.stop();
   }, [iconProgress, isFocused, reduceMotion]);
 
   useEffect(() => {
@@ -97,7 +112,12 @@ function TabButton({ index, isFocused, tab, ...props }: TabButtonProps) {
 
   const iconStyle = {
     transform: [
-      { translateY: iconProgress.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) },
+      {
+        translateY: iconProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -ACTIVE_ICON_OFFSET_Y],
+        }),
+      },
       { scale: iconProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) },
     ],
   } as const;
@@ -128,40 +148,92 @@ function TabButton({ index, isFocused, tab, ...props }: TabButtonProps) {
 function FluidTabList(props: TabListProps) {
   const insets = useSafeAreaInsets();
   const [activeX] = useState(() => new Animated.Value(0));
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [shapeProgress] = useState(() => new Animated.Value(0));
   const [centers] = useState(() => new Map<number, number>());
   const [reduceMotion, setReduceMotion] = useState(false);
+  const activeIndexRef = useRef<number | null>(null);
+  const transitionRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      transitionRef.current?.stop();
+    };
   }, []);
 
   const animateToIndex = (index: number) => {
-    setActiveIndex(index);
     const center = centers.get(index);
-    if (center === undefined) return;
+    if (center === undefined) {
+      activeIndexRef.current = index;
+      return;
+    }
 
-    if (reduceMotion) {
+    if (activeIndexRef.current === null) {
+      activeIndexRef.current = index;
       activeX.setValue(center);
       return;
     }
 
-    Animated.spring(activeX, {
-      toValue: center,
-      damping: 18,
-      mass: 0.8,
-      stiffness: 170,
-      useNativeDriver: true,
-    }).start();
+    if (activeIndexRef.current === index) return;
+
+    activeIndexRef.current = index;
+    transitionRef.current?.stop();
+
+    if (reduceMotion) {
+      activeX.setValue(center);
+      shapeProgress.setValue(0);
+      return;
+    }
+
+    const transition = Animated.sequence([
+      Animated.timing(shapeProgress, {
+        toValue: 1,
+        duration: 45,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(activeX, {
+        toValue: center,
+        duration: INDICATOR_MOVE_DURATION,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(shapeProgress, {
+        toValue: 0,
+        duration: 70,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    transitionRef.current = transition;
+    transition.start(({ finished }) => {
+      if (finished) transitionRef.current = null;
+    });
   };
 
   const registerCenter = (index: number, center: number) => {
     centers.set(index, center);
-    if (activeIndex === index || activeIndex === null) activeX.setValue(center);
+    if (activeIndexRef.current === index || (activeIndexRef.current === null && centers.size === 1)) {
+      activeX.setValue(center);
+    }
   };
+
+  const dashStyle = {
+    opacity: shapeProgress.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, 1, 1] }),
+    transform: [{ translateX: activeX }],
+  } as const;
+
+  const indicatorStyle = {
+    opacity: shapeProgress.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 0, 0] }),
+    transform: [
+      { translateX: activeX },
+      { scale: shapeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0.82] }) },
+    ],
+  } as const;
 
   return (
     <FluidNavigationContext.Provider
@@ -170,11 +242,11 @@ function FluidTabList(props: TabListProps) {
         <View style={styles.tabBar}>
           <Animated.View
             pointerEvents="none"
-            style={[styles.navCurve, { transform: [{ translateX: activeX }] }]}
+            style={[styles.activeDash, dashStyle]}
           />
           <Animated.View
             pointerEvents="none"
-            style={[styles.activeCircle, { transform: [{ translateX: activeX }] }]}
+            style={[styles.activeCircle, indicatorStyle]}
           />
           {props.children}
         </View>
@@ -203,25 +275,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing[3],
     position: 'relative',
   },
-  navCurve: {
-    backgroundColor: Colors.surface.layer2,
+  activeDash: {
+    backgroundColor: Colors.accent.primary,
     borderRadius: BorderRadius.full,
-    height: 74,
-    left: -37,
+    height: ACTIVE_DASH_HEIGHT,
+    left: -ACTIVE_DASH_WIDTH / 2,
     position: 'absolute',
-    top: -28,
-    width: 74,
+    top: (Layout.tabBarHeight + Spacing[2] - ACTIVE_DASH_HEIGHT) / 2,
+    width: ACTIVE_DASH_WIDTH,
   },
   activeCircle: {
+    ...Shadows.md,
     backgroundColor: Colors.accent.primary,
-    borderColor: Colors.surface.layer2,
     borderRadius: BorderRadius.full,
-    borderWidth: 4,
-    height: 56,
-    left: -28,
+    height: ACTIVE_INDICATOR_SIZE,
+    left: -ACTIVE_INDICATOR_SIZE / 2,
     position: 'absolute',
-    top: -4,
-    width: 56,
+    top:
+      (Layout.tabBarHeight + Spacing[2] - ACTIVE_INDICATOR_SIZE) / 2 - ACTIVE_ICON_OFFSET_Y,
+    width: ACTIVE_INDICATOR_SIZE,
   },
   tabButton: {
     alignItems: 'center',
