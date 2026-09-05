@@ -22,6 +22,15 @@ export default function RegisterRoute() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  function navigateBack() {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace('/');
+  }
+
   async function handleRegister() {
     setMessage(null);
 
@@ -66,6 +75,13 @@ export default function RegisterRoute() {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
+        <Pressable
+          accessibilityLabel="Voltar"
+          accessibilityRole="button"
+          onPress={navigateBack}
+          style={styles.backButton}>
+          <Text style={styles.backText}>← Voltar</Text>
+        </Pressable>
         <Text style={styles.title}>Criar conta</Text>
         <Text style={styles.subtitle}>Cadastro de cliente para acessar perfil, pedidos e checkout.</Text>
       </View>
@@ -175,6 +191,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: Spacing[1],
     padding: Layout.screenPaddingH,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 32,
+  },
+  backText: {
+    color: Colors.accent.primary,
+    fontSize: 13,
+    fontWeight: '800',
   },
   title: {
     color: Colors.text.primary,

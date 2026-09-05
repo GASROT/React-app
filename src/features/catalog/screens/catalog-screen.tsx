@@ -1,6 +1,6 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { listProducts } from '@/features/catalog/api/catalog.api';
@@ -16,6 +16,7 @@ import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 const categories = Object.keys(categoryLabels) as ProductCategory[];
 
 export function CatalogScreen() {
+  const router = useRouter();
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,13 +48,31 @@ export function CatalogScreen() {
         <Text style={styles.input}>MAP, NPK 11-52-0, defensivo...</Text>
       </View>
 
+      <View style={styles.chips}>
+        {categories.map((category) => (
+          <Pressable
+            accessibilityLabel={`Ver ${categoryLabels[category]}`}
+            accessibilityRole="button"
+            key={category}
+            onPress={() => router.push('/categories')}
+            style={styles.categoryTile}>
+            <View
+              style={[styles.categoryCircle, { backgroundColor: Colors.categorySoft[category] }]}>
+              <Text style={[styles.categoryInitial, { color: Colors.category[category] }]}>
+                {categoryLabels[category].charAt(0)}
+              </Text>
+            </View>
+            <Text numberOfLines={2} style={styles.categoryLabel}>
+              {categoryLabels[category]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.filters}
         horizontal
         showsHorizontalScrollIndicator={false}>
-        {categories.map((category) => (
-          <ProductBadge key={category} label={categoryLabels[category]} tone={category} />
-        ))}
         <ProductBadge label="Disponivel" tone="success" />
         <ProductBadge label="Atacado PJ" tone="accent" />
       </ScrollView>
@@ -108,13 +127,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing[3],
     paddingVertical: Spacing[3],
   },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: Layout.screenPaddingH,
+    paddingTop: Spacing[5],
+    rowGap: Spacing[4],
+    width: '100%',
+  },
+  categoryTile: {
+    alignItems: 'center',
+    gap: Spacing[2],
+    minWidth: 64,
+  },
+  categoryCircle: {
+    alignItems: 'center',
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    height: 64,
+    justifyContent: 'center',
+    width: 64,
+  },
+  categoryInitial: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  categoryLabel: {
+    color: Colors.text.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
   filters: {
     gap: Spacing[1.5],
-    padding: Layout.screenPaddingH,
+    paddingBottom: Spacing[5],
+    paddingHorizontal: Layout.screenPaddingH,
+    paddingTop: Spacing[2],
   },
   list: {
     gap: Layout.itemGap,
     paddingHorizontal: Layout.screenPaddingH,
+    paddingTop: Spacing[2],
     paddingBottom: Layout.tabBarHeight + Spacing[6],
   },
   emptyText: {

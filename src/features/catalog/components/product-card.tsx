@@ -44,7 +44,7 @@ export function ProductCard({ product, compact = false }: Props) {
       if (added) {
         await removeProduct(product.id);
       } else {
-        await addProduct(product.id, product.minMultiple ?? 1);
+        await addProduct(product, product.minMultiple ?? 1);
       }
     } catch {
       // The cart store exposes the API error to the surrounding screen.
