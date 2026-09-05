@@ -1,6 +1,10 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+// Import circular com auth-api.ts (que importa apiRequest daqui): seguro porque
+// getAccessToken so e chamado dentro de uma funcao, apos ambos os modulos carregarem.
+import { getAccessToken } from './auth-api';
+
 const DEFAULT_API_URL = 'http://localhost:3000/api/v1';
 
 function getExpoHostApiUrl() {
@@ -63,12 +67,19 @@ export function getApiErrorMessage(error: unknown) {
   return 'Nao foi possivel conectar a API. Verifique sua conexao e se o servidor esta disponivel.';
 }
 
+function getAuthHeader(): Record<string, string> {
+  const token = getAccessToken();
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      ...getAuthHeader(),
       ...init?.headers,
     },
   });
