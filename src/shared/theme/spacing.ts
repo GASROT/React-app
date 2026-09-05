@@ -17,18 +17,18 @@ export const Spacing = {
 } as const;
 
 export const Layout = {
-  screenPaddingH: 16,
-  screenPaddingV: 12,
-  cardPadding: 12,
-  cardPaddingLg: 16,
+  screenPaddingH: 20,
+  screenPaddingV: 16,
+  cardPadding: 16,
+  cardPaddingLg: 24,
   sectionGap: 24,
-  itemGap: 8,
-  inputHeight: 44,
-  buttonHeightLg: 48,
-  buttonHeightMd: 36,
-  buttonHeightSm: 28,
-  tabBarHeight: 56,
-  headerHeight: 52,
+  itemGap: 12,
+  inputHeight: 48,
+  buttonHeightLg: 52,
+  buttonHeightMd: 44,
+  buttonHeightSm: 40,
+  touchTarget: 48,
+  tabBarHeight: 74,
+  headerHeight: 56,
   cardBorderWidth: 1,
 } as const;
-

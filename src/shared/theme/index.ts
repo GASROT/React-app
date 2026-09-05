@@ -1,5 +1,5 @@
 import { BorderRadius } from './border-radius';
-import { Colors } from './colors';
+import { Colors, Palette } from './colors';
 import { Shadows } from './shadows';
 import { Layout, Spacing } from './spacing';
 import { Typography } from './typography';
@@ -11,9 +11,9 @@ export const theme = {
   layout: Layout,
   borderRadius: BorderRadius,
   shadows: Shadows,
-  isDark: true,
+  isDark: false,
 } as const;
 
 export type AppTheme = typeof theme;
-export { BorderRadius, Colors, Layout, Shadows, Spacing, Typography };
+export { BorderRadius, Colors, Layout, Palette, Shadows, Spacing, Typography };
 
