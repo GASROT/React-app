@@ -19,6 +19,7 @@ import { PriceDisplay } from '@/features/catalog/components/price-display';
 import { ProductBadge } from '@/features/catalog/components/product-badge';
 import { ProductCard } from '@/features/catalog/components/product-card';
 import { getFeaturedBanners, listProducts } from '@/features/catalog/api/catalog.api';
+import { useCart } from '@/features/cart/store/cart.store';
 import {
   categoryLabels,
   type Product,
@@ -401,6 +402,8 @@ type HeroBannerData = {
 function Header() {
   const router = useRouter();
   const user = useSyncExternalStore(subscribeAuth, getCurrentUser, getCurrentUser);
+  const { cart } = useCart();
+  const cartItemCount = cart.items.reduce((total, item) => total + item.quantity, 0);
 
   return (
     <View style={styles.header}>
@@ -429,10 +432,14 @@ function Header() {
             <Text style={styles.loginButtonText}>Entrar</Text>
           </Pressable>
         )}
-        <View style={styles.cartButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Abrir carrinho"
+          onPress={() => router.push('/(tabs)/cart' as never)}
+          style={styles.cartButton}>
           <Text style={styles.iconButtonText}>Cart</Text>
-          <Text style={styles.badge}>3</Text>
-        </View>
+          {cartItemCount > 0 ? <Text style={styles.badge}>{cartItemCount}</Text> : null}
+        </Pressable>
       </View>
     </View>
   );
