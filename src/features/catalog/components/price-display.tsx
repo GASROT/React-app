@@ -6,20 +6,17 @@ import { Colors, Spacing } from '@/shared/theme';
 type Props = {
   price: number;
   oldPrice?: number;
+  unit?: string;
   size?: 'sm' | 'lg';
 };
 
-export function PriceDisplay({ price, oldPrice, size = 'sm' }: Props) {
-  const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : 0;
-
+export function PriceDisplay({ price, oldPrice, unit, size = 'sm' }: Props) {
   return (
     <View style={styles.row}>
-      {discount > 0 ? (
-        <Text style={styles.discount}>{`-${discount}%`}</Text>
-      ) : null}
       <Text style={[styles.price, size === 'lg' && styles.priceLarge]}>
         {formatCurrency(price)}
       </Text>
+      {unit ? <Text style={styles.unit}>/{unit}</Text> : null}
       {oldPrice ? <Text style={styles.oldPrice}>{formatCurrency(oldPrice)}</Text> : null}
     </View>
   );
@@ -27,34 +24,30 @@ export function PriceDisplay({ price, oldPrice, size = 'sm' }: Props) {
 
 const styles = StyleSheet.create({
   row: {
-    alignItems: 'center',
+    alignItems: 'baseline',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing[1.5],
   },
-  discount: {
-    backgroundColor: Colors.feedback.success,
-    borderRadius: 2,
-    color: Colors.text.inverse,
-    fontSize: 11,
-    fontWeight: '800',
-    paddingHorizontal: Spacing[1.5],
-    paddingVertical: Spacing[0.5],
-  },
   price: {
     color: Colors.text.price,
-    fontSize: 16,
+    fontSize: 18,
     fontVariant: ['tabular-nums'],
     fontWeight: '800',
   },
   priceLarge: {
-    fontSize: 24,
+    fontSize: 28,
+  },
+  unit: {
+    color: Colors.text.muted,
+    fontSize: 12,
+    fontWeight: '600',
   },
   oldPrice: {
     color: Colors.text.priceOld,
-    fontSize: 12,
+    fontSize: 13,
     fontVariant: ['tabular-nums'],
+    fontWeight: '600',
     textDecorationLine: 'line-through',
   },
 });
-
