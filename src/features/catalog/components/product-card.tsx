@@ -28,6 +28,9 @@ export function ProductCard({ product, compact = false }: Props) {
   const added = quantity > 0;
   const isAdmin = user?.role === 'ADMIN';
   const cartButtonDisabled = unavailable || loading || updatingCart;
+  const discountLabel = product.oldPrice
+    ? `-${Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)}%`
+    : null;
   const openProduct = () => {
     router.push({ pathname: '/products/[id]', params: { id: product.id } });
   };
@@ -130,23 +133,25 @@ export function ProductCard({ product, compact = false }: Props) {
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.visual}>
         <ProductMarker product={product} size={58} />
-        <View style={styles.badgeOverlay}>
-          <ProductBadge label={categoryLabels[product.category]} tone={product.category} />
-          {product.oldPrice ? <ProductBadge label="Promocao" tone="success" /> : null}
-        </View>
-        <Text style={styles.favorite}>♡</Text>
+        {discountLabel ? (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountBadgeText}>{discountLabel}</Text>
+          </View>
+        ) : (
+          <View style={styles.badgeOverlay}>
+            <ProductBadge label={categoryLabels[product.category]} tone={product.category} />
+          </View>
+        )}
       </View>
 
       <View style={styles.body}>
         <Text numberOfLines={2} style={styles.name}>
           {product.name}
         </Text>
-        <Text style={styles.brand}>{product.manufacturer}</Text>
-        <Text style={styles.meta}>
-          SKU {product.sku} {product.npk ? `| NPK ${product.npk}` : ''}
+        <Text numberOfLines={1} style={styles.brand}>
+          {product.manufacturer} · {product.packageSize}
         </Text>
-        <Text style={styles.rating}>★ {product.rating.toFixed(1)} ({product.reviews})</Text>
-        <PriceDisplay price={product.price} oldPrice={product.oldPrice} />
+        <PriceDisplay price={product.price} oldPrice={product.oldPrice} unit={product.unit} />
         <Pressable
           accessibilityLabel={
             isAdmin
@@ -223,22 +228,20 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface.layer1,
     borderColor: Colors.border.default,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: Layout.cardBorderWidth,
     flex: 1,
     overflow: 'hidden',
-    ...Shadows.card,
+    ...Shadows.sm,
   },
   pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   visual: {
     alignItems: 'center',
-    backgroundColor: Colors.surface.layer2,
-    borderBottomColor: Colors.border.subtle,
-    borderBottomWidth: 1,
-    height: 128,
+    backgroundColor: Colors.surface.sunken,
+    height: 112,
     justifyContent: 'center',
   },
   badgeOverlay: {
@@ -248,18 +251,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing[2],
   },
-  favorite: {
-    backgroundColor: Colors.surface.overlay,
+  discountBadge: {
+    backgroundColor: Colors.feedback.warning,
     borderRadius: BorderRadius.full,
-    color: Colors.text.secondary,
-    fontSize: 16,
-    height: 28,
-    lineHeight: 27,
+    left: Spacing[2],
+    paddingHorizontal: Spacing[2.5],
+    paddingVertical: Spacing[1],
     position: 'absolute',
-    right: Spacing[2],
-    textAlign: 'center',
     top: Spacing[2],
-    width: 28,
+  },
+  discountBadgeText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   marker: {
     alignItems: 'center',
@@ -278,13 +282,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   body: {
-    gap: Spacing[1],
-    padding: Layout.cardPadding,
+    gap: Spacing[1.5],
+    padding: Spacing[3],
   },
   name: {
     color: Colors.text.primary,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 19,
   },
   brand: {
@@ -303,28 +307,26 @@ const styles = StyleSheet.create({
   },
   addButton: {
     alignItems: 'center',
-    backgroundColor: Colors.surface.layer3,
-    borderColor: Colors.border.default,
+    backgroundColor: Colors.accent.primary,
     borderRadius: BorderRadius.sm,
-    borderWidth: 1,
     justifyContent: 'center',
-    marginTop: Spacing[1],
-    minHeight: 44,
+    marginTop: Spacing[0.5],
+    minHeight: Layout.buttonHeightSm,
     paddingHorizontal: Spacing[2],
-    paddingVertical: Spacing[2],
   },
   addButtonText: {
-    color: Colors.accent.primary,
-    fontSize: 12,
-    fontWeight: '800',
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
   },
   addedButton: {
-    backgroundColor: Colors.feedback.success,
-    borderColor: Colors.feedback.success,
+    backgroundColor: Colors.accent.primaryMuted,
+    borderColor: Colors.accent.primaryBorder,
+    borderWidth: 1,
   },
   addedButtonText: {
-    color: Colors.surface.base,
+    color: Colors.feedback.successText,
   },
   adminButton: {
     backgroundColor: Colors.accent.primary,
