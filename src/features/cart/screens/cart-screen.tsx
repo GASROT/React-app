@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -72,7 +73,29 @@ export function CartScreen() {
         </View>
       ) : cart.items.length === 0 ? (
         <View style={styles.stateContainer}>
-          <Text style={styles.stateText}>{loading ? 'Carregando carrinho...' : 'Seu carrinho esta vazio.'}</Text>
+          {loading ? (
+            <Text style={styles.stateText}>Carregando carrinho...</Text>
+          ) : (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <SymbolView
+                  name={{ ios: 'cart', android: 'shopping_cart', web: 'shopping_cart' }}
+                  size={26}
+                  tintColor={Colors.text.link}
+                />
+              </View>
+              <Text style={styles.emptyTitle}>Seu carrinho esta vazio</Text>
+              <Text style={styles.emptyBody}>
+                Veja o que os produtores perto de voce colheram esta semana.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/catalog' as never)}
+                style={styles.emptyButton}>
+                <Text style={styles.emptyButtonText}>Ver ofertas de hoje</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       ) : (
         <>
@@ -235,9 +258,52 @@ const styles = StyleSheet.create({
   },
   stateText: {
     color: Colors.text.muted,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     textAlign: 'center',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: Colors.surface.layer1,
+    borderColor: Colors.border.strong,
+    borderRadius: BorderRadius.lg,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    gap: Spacing[2.5],
+    padding: Spacing[6],
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primaryMuted,
+    borderRadius: BorderRadius.full,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  emptyTitle: {
+    color: Colors.text.primary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyBody: {
+    color: Colors.text.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primary,
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    marginTop: Spacing[1],
+    minHeight: Layout.buttonHeightMd,
+    paddingHorizontal: Spacing[5],
+  },
+  emptyButtonText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   errorText: {
     color: Colors.feedback.error,
