@@ -1,0 +1,30 @@
+name: Mobile CD
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  eas-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate EAS secrets
+        shell: bash
+        run: |
+          test -n "$EXPO_TOKEN" || (echo "Missing EXPO_TOKEN secret" && exit 1)
+          test -n "$EAS_PROJECT_ID" || (echo "Missing EAS_PROJECT_ID secret" && exit 1)
+      - run: npm ci --no-audit --no-fund
+      - run: npm run eas:build:preview

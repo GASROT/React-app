@@ -1,0 +1,31 @@
+name: Mobile CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, prototipo/app]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint:ci
+      - run: npm run typecheck
+      - run: npm run test:ci
+      - run: npm run build:ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expo-android-bundle
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
