@@ -16,7 +16,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PriceDisplay } from '@/features/catalog/components/price-display';
-import { ProductBadge } from '@/features/catalog/components/product-badge';
 import { ProductCard } from '@/features/catalog/components/product-card';
 import { getFeaturedBanners, listProducts } from '@/features/catalog/api/catalog.api';
 import { useCart } from '@/features/cart/store/cart.store';
@@ -150,9 +149,6 @@ export function HomeScreen() {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Header />
-        <View style={styles.search}>
-          <Text style={styles.searchText}>Buscar fertilizantes, defensivos, SKU...</Text>
-        </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -282,19 +278,46 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        <SectionHeader
-          title="Categorias"
-          action="Ver todas"
-          onActionPress={() => router.push('/categories')}
-        />
         <ScrollView
           contentContainerStyle={styles.chips}
           horizontal
           showsHorizontalScrollIndicator={false}>
           {categories.map((category) => (
-            <ProductBadge key={category} label={categoryLabels[category]} tone={category} />
+            <Pressable
+              accessibilityLabel={`Ver ${categoryLabels[category]}`}
+              accessibilityRole="button"
+              key={category}
+              onPress={() => router.push('/categories')}
+              style={styles.categoryTile}>
+              <View
+                style={[
+                  styles.categoryCircle,
+                  { backgroundColor: Colors.categorySoft[category] },
+                ]}>
+                <Text style={[styles.categoryInitial, { color: Colors.category[category] }]}>
+                  {categoryLabels[category].charAt(0)}
+                </Text>
+              </View>
+              <Text numberOfLines={2} style={styles.categoryLabel}>
+                {categoryLabels[category]}
+              </Text>
+            </Pressable>
           ))}
         </ScrollView>
+
+        <View style={styles.shippingBanner}>
+          <View style={styles.shippingIcon}>
+            <SymbolView
+              name={{ ios: 'shippingbox.fill', android: 'local_shipping', web: 'local_shipping' }}
+              size={22}
+              tintColor={Colors.white}
+            />
+          </View>
+          <View style={styles.shippingCopy}>
+            <Text style={styles.shippingTitle}>Frete gratis acima de R$ 500</Text>
+            <Text style={styles.shippingSubtitle}>Entrega em ate 2 dias na sua regiao</Text>
+          </View>
+        </View>
 
         <SectionHeader
           title="Em destaque"
@@ -407,40 +430,65 @@ function Header() {
 
   return (
     <View style={styles.header}>
-      <Text style={styles.logo}>
-        Agro<Text style={styles.logoAccent}>Shop</Text>
-      </Text>
-      <View style={styles.headerActions}>
-        {user ? (
+      <View style={styles.headerTopRow}>
+        <View style={styles.headerIdentity}>
+          <Text style={styles.headerEyebrow}>ENTREGAR EM</Text>
+          <Text numberOfLines={1} style={styles.headerLocation}>
+            Ribeirao Preto, SP
+          </Text>
+        </View>
+        <View style={styles.headerActions}>
+          {user ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir perfil"
+              onPress={() => router.push('/profile' as never)}
+              style={styles.headerIconButton}>
+              <SymbolView
+                name={{ ios: 'person.fill', android: 'person', web: 'person' }}
+                size={18}
+                tintColor={Colors.white}
+              />
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Entrar na conta"
+              onPress={() => router.push('/login' as never)}
+              style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Entrar</Text>
+            </Pressable>
+          )}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Abrir perfil"
-            onPress={() => router.push('/profile' as never)}
-            style={styles.profileButton}>
+            accessibilityLabel="Abrir carrinho"
+            onPress={() => router.push('/(tabs)/cart' as never)}
+            style={styles.headerIconButton}>
             <SymbolView
-              name={{ ios: 'person.fill', android: 'person', web: 'person' }}
+              name={{ ios: 'cart.fill', android: 'shopping_cart', web: 'shopping_cart' }}
               size={18}
-              tintColor={Colors.accent.primary}
+              tintColor={Colors.white}
             />
+            {cartItemCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{cartItemCount}</Text>
+              </View>
+            ) : null}
           </Pressable>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Entrar na conta"
-            onPress={() => router.push('/login' as never)}
-            style={styles.loginButton}>
-            <Text style={styles.loginButtonText}>Entrar</Text>
-          </Pressable>
-        )}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir carrinho"
-          onPress={() => router.push('/(tabs)/cart' as never)}
-          style={styles.cartButton}>
-          <Text style={styles.iconButtonText}>Cart</Text>
-          {cartItemCount > 0 ? <Text style={styles.badge}>{cartItemCount}</Text> : null}
-        </Pressable>
+        </View>
       </View>
+
+      <Pressable
+        accessibilityRole="search"
+        onPress={() => router.push('/catalog' as never)}
+        style={styles.search}>
+        <SymbolView
+          name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
+          size={18}
+          tintColor={Colors.text.muted}
+        />
+        <Text style={styles.searchText}>Buscar semente, adubo, defensivo...</Text>
+      </Pressable>
     </View>
   );
 }
@@ -473,101 +521,88 @@ const styles = StyleSheet.create({
     paddingBottom: Layout.tabBarHeight + Spacing[6],
   },
   header: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface.layer2,
-    borderBottomColor: Colors.border.subtle,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    height: Layout.headerHeight,
-    justifyContent: 'space-between',
+    backgroundColor: Colors.surface.brand,
+    gap: Spacing[4],
+    paddingBottom: Spacing[5],
     paddingHorizontal: Layout.screenPaddingH,
+    paddingTop: Spacing[3],
   },
-  logo: {
-    color: Colors.text.primary,
-    fontSize: 18,
-    fontWeight: '900',
+  headerTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  logoAccent: {
-    color: Colors.accent.primary,
+  headerIdentity: {
+    flex: 1,
+    gap: Spacing[0.5],
+  },
+  headerEyebrow: {
+    color: Colors.text.onBrand,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+  },
+  headerLocation: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '800',
   },
   headerActions: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: Spacing[2],
   },
+  headerIconButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: BorderRadius.full,
+    height: 38,
+    justifyContent: 'center',
+    position: 'relative',
+    width: 38,
+  },
   loginButton: {
     alignItems: 'center',
-    backgroundColor: Colors.surface.layer3,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: BorderRadius.full,
+    height: 38,
     justifyContent: 'center',
-    paddingHorizontal: Spacing[3],
+    paddingHorizontal: Spacing[4],
   },
   loginButtonText: {
-    color: Colors.accent.primary,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  profileButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface.layer3,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  cartButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface.layer3,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: 'center',
-    minWidth: 46,
-    position: 'relative',
-  },
-  iconButtonText: {
-    color: Colors.text.secondary,
-    fontSize: 11,
+    color: Colors.white,
+    fontSize: 13,
     fontWeight: '700',
   },
   badge: {
-    backgroundColor: Colors.accent.primary,
-    borderColor: Colors.surface.base,
+    alignItems: 'center',
+    backgroundColor: Colors.feedback.warning,
     borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    color: Colors.text.inverse,
-    fontSize: 9,
-    fontWeight: '900',
-    height: 16,
-    lineHeight: 14,
+    height: 18,
+    justifyContent: 'center',
+    minWidth: 18,
+    paddingHorizontal: Spacing[1],
     position: 'absolute',
-    right: -5,
-    textAlign: 'center',
-    top: -5,
-    width: 16,
+    right: -2,
+    top: -2,
+  },
+  badgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: '800',
   },
   search: {
-    backgroundColor: Colors.surface.layer1,
-    borderBottomColor: Colors.border.subtle,
-    borderBottomWidth: 1,
-    paddingHorizontal: Layout.screenPaddingH,
-    paddingVertical: Spacing[2],
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    flexDirection: 'row',
+    gap: Spacing[2.5],
+    height: 46,
+    paddingHorizontal: Spacing[4],
   },
   searchText: {
-    backgroundColor: Colors.surface.layer2,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
     color: Colors.text.muted,
-    fontSize: 13,
-    minHeight: Layout.inputHeight,
-    paddingHorizontal: Spacing[3],
-    paddingVertical: Spacing[3],
+    fontSize: 14,
   },
   carouselBlock: {
     marginVertical: Layout.screenPaddingH,
@@ -721,9 +756,66 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chips: {
-    gap: Spacing[1.5],
+    gap: Spacing[4],
     paddingHorizontal: Layout.screenPaddingH,
-    paddingBottom: Spacing[2],
+    paddingVertical: Spacing[5],
+  },
+  categoryTile: {
+    alignItems: 'center',
+    gap: Spacing[2],
+    width: 72,
+  },
+  categoryCircle: {
+    alignItems: 'center',
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    height: 64,
+    justifyContent: 'center',
+    width: 64,
+  },
+  categoryInitial: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  categoryLabel: {
+    color: Colors.text.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  shippingBanner: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primaryMuted,
+    borderColor: Colors.accent.primaryBorder,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: Spacing[3],
+    marginHorizontal: Layout.screenPaddingH,
+    padding: Spacing[4],
+  },
+  shippingIcon: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primary,
+    borderRadius: BorderRadius.sm,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  shippingCopy: {
+    flex: 1,
+    gap: Spacing[0.5],
+  },
+  shippingTitle: {
+    color: Colors.feedback.successText,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  shippingSubtitle: {
+    color: Colors.text.link,
+    fontSize: 12,
   },
   productRow: {
     gap: Layout.itemGap,
