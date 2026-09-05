@@ -1,4 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useCallback, useSyncExternalStore, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -47,6 +48,14 @@ export function OrdersScreen() {
     useCallback(() => {
       let mounted = true;
 
+      if (!user) {
+        setError(null);
+        setMessage(null);
+        setOrderList([]);
+        setLoading(false);
+        return undefined;
+      }
+
       setLoading(true);
       const request = isAdmin
         ? listAdminOrders().then((orders) => orders.map(mapAdminOrder))
@@ -74,7 +83,7 @@ export function OrdersScreen() {
       return () => {
         mounted = false;
       };
-    }, [isAdmin]),
+    }, [isAdmin, user]),
   );
 
   async function advanceOrderStatus(order: Order) {
@@ -109,12 +118,42 @@ export function OrdersScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.timeline} showsVerticalScrollIndicator={false}>
-        {loading ? <Text style={styles.emptyText}>Carregando pedidos...</Text> : null}
+        {loading ? <Text style={styles.stateText}>Carregando pedidos...</Text> : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {!loading && orderList.length === 0 ? (
-          <Text style={error ? styles.errorText : styles.emptyText}>
-            {error ?? 'Nenhum pedido retornado pela API.'}
-          </Text>
+          error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <SymbolView
+                  name={{
+                    ios: user ? 'shippingbox' : 'person',
+                    android: user ? 'inventory_2' : 'person',
+                    web: user ? 'inventory_2' : 'person',
+                  }}
+                  size={26}
+                  tintColor={Colors.text.link}
+                />
+              </View>
+              <Text style={styles.emptyTitle}>
+                {user ? 'Voce ainda nao tem pedidos' : 'Faca login para ver seus pedidos'}
+              </Text>
+              <Text style={styles.emptyBody}>
+                {user
+                  ? 'Seus pedidos aparecem aqui assim que voce finalizar uma compra.'
+                  : 'Entre na sua conta para acompanhar historico, status e rastreamento.'}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push((user ? '/catalog' : '/login') as never)}
+                style={styles.emptyButton}>
+                <Text style={styles.emptyButtonText}>
+                  {user ? 'Ver ofertas de hoje' : 'Entrar'}
+                </Text>
+              </Pressable>
+            </View>
+          )
         ) : null}
         {orderList.map((order) => (
           <Pressable
@@ -272,14 +311,63 @@ const styles = StyleSheet.create({
     padding: Layout.screenPaddingH,
     paddingBottom: Layout.tabBarHeight + Spacing[6],
   },
-  emptyText: {
+  stateText: {
     color: Colors.text.muted,
-    fontSize: 13,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: Colors.surface.layer1,
+    borderColor: Colors.border.strong,
+    borderRadius: BorderRadius.lg,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    gap: Spacing[2.5],
+    marginTop: Spacing[6],
+    maxWidth: 360,
+    padding: Spacing[6],
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primaryMuted,
+    borderRadius: BorderRadius.full,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  emptyTitle: {
+    color: Colors.text.primary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyBody: {
+    color: Colors.text.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primary,
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    marginTop: Spacing[1],
+    minHeight: Layout.buttonHeightMd,
+    paddingHorizontal: Spacing[5],
+  },
+  emptyButtonText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   errorText: {
     color: Colors.feedback.error,
     fontSize: 13,
     fontWeight: '800',
+    textAlign: 'center',
   },
   message: {
     color: Colors.brand.cyan,

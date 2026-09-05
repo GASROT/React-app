@@ -107,7 +107,7 @@ export function ProductDetailScreen() {
     setActionFeedback(null);
 
     try {
-      await addProduct(product.id, product.minMultiple ?? 1);
+      await addProduct(product, product.minMultiple ?? 1);
       setActionFeedback('Produto adicionado ao carrinho.');
       return true;
     } catch {
@@ -199,6 +199,12 @@ export function ProductDetailScreen() {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       {!product ? (
         <View style={styles.stateContainer}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={navigateBack}
+            style={styles.stateBackButton}>
+            <Text style={styles.back}>Voltar</Text>
+          </Pressable>
           <Text style={error ? styles.errorText : styles.stateText}>
             {error ?? 'Carregando produto...'}
           </Text>
@@ -206,8 +212,8 @@ export function ProductDetailScreen() {
       ) : (
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" onPress={navigateBack}>
-            <Text style={styles.back}>Menu</Text>
+          <Pressable accessibilityLabel="Voltar" accessibilityRole="button" onPress={navigateBack}>
+            <Text style={styles.back}>← Voltar</Text>
           </Pressable>
           <Text style={styles.wishlist}>★ Lista de desejos</Text>
         </View>
@@ -498,6 +504,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: Layout.screenPaddingH,
+  },
+  stateBackButton: {
+    left: Layout.screenPaddingH,
+    position: 'absolute',
+    top: Spacing[4],
   },
   stateText: {
     color: Colors.text.muted,

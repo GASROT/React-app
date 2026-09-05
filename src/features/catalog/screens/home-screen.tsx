@@ -278,10 +278,7 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        <ScrollView
-          contentContainerStyle={styles.chips}
-          horizontal
-          showsHorizontalScrollIndicator={false}>
+        <View style={styles.chips}>
           {categories.map((category) => (
             <Pressable
               accessibilityLabel={`Ver ${categoryLabels[category]}`}
@@ -303,7 +300,7 @@ export function HomeScreen() {
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
 
         <View style={styles.shippingBanner}>
           <View style={styles.shippingIcon}>
@@ -756,14 +753,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chips: {
-    gap: Spacing[4],
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     paddingHorizontal: Layout.screenPaddingH,
     paddingVertical: Spacing[5],
+    rowGap: Spacing[4],
+    width: '100%',
   },
   categoryTile: {
     alignItems: 'center',
     gap: Spacing[2],
-    width: 72,
+    minWidth: 64,
   },
   categoryCircle: {
     alignItems: 'center',
