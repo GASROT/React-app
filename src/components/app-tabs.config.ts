@@ -1,3 +1,5 @@
+import type { AndroidSymbol, SFSymbol } from 'expo-symbols';
+
 import type { UserRole } from '@/shared/services/api/auth-api';
 
 export type AppTabConfig = {
@@ -7,12 +9,12 @@ export type AppTabConfig = {
   label: string;
   icon: string;
   sf: {
-    default: string;
-    selected: string;
+    default: SFSymbol;
+    selected: SFSymbol;
   };
   md: {
-    default: string;
-    selected: string;
+    default: AndroidSymbol;
+    selected: AndroidSymbol;
   };
   roles?: UserRole[];
 };

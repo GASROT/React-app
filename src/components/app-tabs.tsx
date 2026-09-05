@@ -115,9 +115,10 @@ function TabButton({ index, isFocused, tab, ...props }: TabButtonProps) {
           name={{
             ios: isFocused ? tab.sf.selected : tab.sf.default,
             android: isFocused ? tab.md.selected : tab.md.default,
-          } as never}
+            web: isFocused ? tab.md.selected : tab.md.default,
+          }}
           size={22}
-          tintColor={isFocused ? Colors.surface.base : Colors.text.primary}
+          tintColor={isFocused ? Colors.white : Colors.text.disabled}
         />
       </Animated.View>
     </Pressable>

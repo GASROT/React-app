@@ -6,10 +6,19 @@ import {
   TabTriggerSlotProps,
   Tabs,
 } from 'expo-router/ui';
+import { SymbolView } from 'expo-symbols';
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
-import { Animated, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
-import { getAppTabsForRole } from '@/components/app-tabs.config';
+import { getAppTabsForRole, type AppTabConfig } from '@/components/app-tabs.config';
 import { getCurrentUser, subscribeAuth } from '@/shared/services/api/auth-api';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
@@ -36,7 +45,7 @@ export default function AppTabs() {
               name={tab.webName}
               href={tab.href as never}
               asChild>
-              <TabButton index={index} icon={tab.icon} label={tab.label} />
+              <TabButton index={index} tab={tab} />
             </TabTrigger>
           ))}
         </CustomTabList>
@@ -47,12 +56,16 @@ export default function AppTabs() {
 
 type TabButtonProps = TabTriggerSlotProps & {
   index: number;
-  icon: string;
-  label: string;
+  tab: AppTabConfig;
 };
 
-export function TabButton({ index, icon, label, isFocused, ...props }: TabButtonProps) {
+// Abaixo desta largura a barra usa apenas icones; acima cabe o rotulo escrito.
+const ICON_ONLY_MAX_WIDTH = 768;
+
+export function TabButton({ index, tab, isFocused, ...props }: TabButtonProps) {
   const navigation = useContext(NavigationContext);
+  const { width } = useWindowDimensions();
+  const iconOnly = width < ICON_ONLY_MAX_WIDTH;
   const [iconProgress] = useState(() => new Animated.Value(isFocused ? 1 : 0));
 
   useEffect(() => {
@@ -85,15 +98,28 @@ export function TabButton({ index, icon, label, isFocused, ...props }: TabButton
   return (
     <Pressable
       {...props}
-      accessibilityLabel={label}
+      accessibilityLabel={tab.label}
       accessibilityRole="tab"
       accessibilityState={{ selected: isFocused }}
       onLayout={handleLayout}
       style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>
       <Animated.View style={[styles.iconContainer, iconStyle]}>
-        <Text style={[styles.tabIcon, isFocused ? styles.activeIcon : styles.inactiveIcon]}>
-          {icon}
-        </Text>
+        {iconOnly ? (
+          <SymbolView
+            fallback={
+              <Text style={[styles.tabIcon, isFocused ? styles.activeIcon : styles.inactiveIcon]}>
+                {tab.icon}
+              </Text>
+            }
+            name={{ web: isFocused ? tab.md.selected : tab.md.default }}
+            size={22}
+            tintColor={isFocused ? Colors.white : Colors.text.disabled}
+          />
+        ) : (
+          <Text style={[styles.tabLabel, isFocused ? styles.activeIcon : styles.inactiveIcon]}>
+            {tab.label}
+          </Text>
+        )}
       </Animated.View>
     </Pressable>
   );
@@ -215,6 +241,11 @@ const styles = StyleSheet.create({
   tabIcon: {
     fontSize: 16,
     fontWeight: '800',
+    lineHeight: 20,
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: '700',
     lineHeight: 20,
   },
   activeIcon: {
