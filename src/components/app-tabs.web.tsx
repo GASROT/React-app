@@ -218,9 +218,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   activeIcon: {
-    color: Colors.surface.base,
+    color: Colors.white,
   },
   inactiveIcon: {
-    color: Colors.text.primary,
+    color: Colors.text.disabled,
   },
 });
