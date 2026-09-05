@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { login } from '@/shared/services/api/auth-api';
+import { getApiErrorMessage } from '@/shared/services/api/api-client';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 const customerDemo = {
@@ -28,11 +29,17 @@ export default function LoginRoute() {
     setLoading(true);
     setError(null);
 
+    if (!email.trim() || !password) {
+      setError('Informe e-mail e senha.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await login(email.trim(), password);
       router.replace((response.user.role === 'ADMIN' ? '/dashboard' : '/catalog') as never);
-    } catch {
-      setError('Nao foi possivel autenticar. Confira e-mail e senha.');
+    } catch (err) {
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }

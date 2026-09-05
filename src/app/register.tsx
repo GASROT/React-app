@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { register, type RegisterPayload } from '@/shared/services/api/auth-api';
+import { getApiErrorMessage } from '@/shared/services/api/api-client';
 import { BorderRadius, Colors, Layout, Spacing } from '@/shared/theme';
 
 const initialForm: RegisterPayload = {
@@ -22,18 +23,41 @@ export default function RegisterRoute() {
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleRegister() {
-    setLoading(true);
     setMessage(null);
+
+    const document = form.document.replace(/\D/g, '');
+
+    if (!form.name.trim()) {
+      setMessage('Informe seu nome.');
+      return;
+    }
+
+    if (!form.email.trim()) {
+      setMessage('Informe um e-mail valido.');
+      return;
+    }
+
+    if (form.password.length < 8) {
+      setMessage('A senha deve ter pelo menos 8 caracteres.');
+      return;
+    }
+
+    if (!document) {
+      setMessage(form.profileType === 'PF' ? 'Informe o CPF.' : 'Informe o CNPJ.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const response = await register({
         ...form,
         email: form.email.trim(),
-        document: form.document.replace(/\D/g, ''),
+        document,
       });
       router.replace((response.user.role === 'ADMIN' ? '/dashboard' : '/catalog') as never);
-    } catch {
-      setMessage('Nao foi possivel registrar. Confira CPF/CNPJ, e-mail e senha.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
